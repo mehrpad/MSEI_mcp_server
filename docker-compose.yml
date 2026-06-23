@@ -32,6 +32,7 @@ services:
   mcp:
     build: ./mcp_server
     image: msei/paperrag-mcp:latest
+    pull_policy: build          # locally built image — build it, never try to pull
     container_name: msei-mcp
     restart: unless-stopped
     depends_on: [qdrant]
@@ -59,6 +60,7 @@ services:
   mcp-secondary:
     build: ./mcp_server
     image: msei/paperrag-mcp:latest
+    pull_policy: build          # locally built image — build it, never try to pull
     container_name: msei-mcp-2
     restart: unless-stopped
     depends_on: [qdrant]
