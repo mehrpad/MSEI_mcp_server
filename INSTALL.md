@@ -1,140 +1,177 @@
 # INSTALL — one-shot setup walkthrough (zero → working search)
 
-This is the **single, line-by-line** runbook: from a blank Linux VM to a working
-first search in OpenCode. Follow it top to bottom. Every command is copy-paste.
+The **single, line-by-line** runbook: from a blank Linux VM to a working first
+search in OpenCode. Follow it top to bottom. Every command is copy-paste.
 
-> Prefer per-topic detail or troubleshooting? The numbered guide in
-> [`docs/`](docs/00-overview.md) covers each step in depth. This file is the
-> condensed linear version.
+This version is **proxy-aware** — it assumes the VM may have **no direct
+internet** (the case on the FAU/RRZE network) and sets the proxy up *before*
+anything tries to reach the internet, which is the order that actually works.
+
+> Per-topic detail / troubleshooting lives in the numbered guide
+> [`docs/`](docs/00-overview.md). Proxy deep-dive: [`docs/11`](docs/11-proxy-setup.md).
 
 ---
 
-## Fill these in once (you'll paste them below)
+## Fill these in once
 
-Write down your real values and substitute them wherever you see the placeholder:
+Substitute these wherever they appear below:
 
-| Placeholder | Means | Example |
-|-------------|-------|---------|
-| `VM_USER` | your login name on the VM | `msei` |
-| `VM_IP` | the VM's address on your network | `10.12.0.5` |
-| `SUBNET` | your group's network range (ask IT) | `10.12.0.0/16` |
-| `BUNDLE` | the snapshot file from the **ingest repo** | `colleague_materials_v2_qdrant_20260601.tar.gz` |
-| `GEMINI_KEY` | your Google Gemini API key | `AIzaSy...` |
+| Placeholder | Means | This deployment (FAU example) |
+|-------------|-------|-------------------------------|
+| `VM_USER` | your login on the VM | `root` |
+| `VM_IP` | the VM's address | `10.76.33.35` |
+| `SUBNET` | your group's network range | `10.76.33.32/28` |
+| `PROXY` | the HTTP proxy (if behind one) | `http://proxy.rrze.uni-erlangen.de:80` |
+| `BUNDLE` | snapshot file from the **ingest repo** | `colleague_materials_v2_qdrant_*.tar.gz` |
+| `GEMINI_KEY` | your Google **AI Studio** key | `AIzaSy...` |
 
-**Before you start, make sure you have:** SSH access to the VM with `sudo`
-rights · the `BUNDLE` file on your own computer · a Google account · confirmation
-that the VM can reach the internet (we test this in Phase 6).
+**Before you start:** SSH access with `sudo`/root · the `BUNDLE` on your own PC ·
+a Google account · your group's `SUBNET`.
+
+> **`sudo` note:** if your prompt ends with `#` you're **root** — omit every
+> `sudo` below and skip the `usermod` step.
 
 ---
 
 ## Phase 1 — Connect to the VM
 
-Run on **your own computer** (PowerShell on Windows, Terminal on macOS/Linux):
+On **your own computer** (PowerShell on Windows, Terminal on macOS/Linux):
 
 ```bash
 ssh VM_USER@VM_IP
 ```
 
-Type `yes` if asked about the fingerprint, then your password. You're in when the
-prompt looks like `VM_USER@...:~$`.
+Everything after this runs **on the VM**.
 
-✓ **Checkpoint:** you see a `$` prompt.
+✓ You see a prompt like `VM_USER@host:~#`.
+
+**Quick network sanity check** (these need no internet, just confirm the VM is on
+the network — usually already configured by IT):
+
+```bash
+ip route | grep default          # → a default gateway exists
+getent hosts github.com          # → resolves to an IP (DNS works)
+```
+
+If DNS doesn't resolve or there's no gateway, fix the netplan first
+([docs/01 & 11 cover this]) — but on a normal FAU VM both already work.
 
 ---
 
-## Phase 1b — If the VM has no direct internet (proxy)
+## Phase 2 — Proxy: do this FIRST if the VM has no direct internet
 
-**Test first** (fast-fail):
+**Test direct internet (fast-fail, 8 s):**
 
 ```bash
-curl -sS -m 8 -o /dev/null -w "%{http_code}\n" https://get.docker.com || echo "BLOCKED"
+curl -sS -m 8 -o /dev/null -w "%{http_code}\n" https://get.docker.com || echo BLOCKED
 ```
 
-- Returns `200`/`301` → you have direct internet. **Skip to Phase 2.**
-- Hangs/`BLOCKED`/timeout → you're behind a proxy (normal on FAU/RRZE). **Do the
-  full proxy setup now: [docs/11-proxy-setup.md](docs/11-proxy-setup.md)**, then
-  come back. On FAU the proxy is `http://proxy.rrze.uni-erlangen.de:80` and it
-  must be set in five places (shell, apt, Docker daemon, build, and the server's
-  runtime `.env`) — docs/11 has every command.
+- Prints `200`/`301` → you have direct internet. **Skip to Phase 3.**
+- Hangs / `BLOCKED` / timeout → you're behind a proxy (normal on FAU/RRZE).
+  **Do the rest of this phase now.**
 
-> Phases 2–3 below assume the proxy is already configured if you needed it.
+**Confirm the proxy reaches both Docker and Google:**
+
+```bash
+curl -x http://proxy.rrze.uni-erlangen.de:80 -sS -m 15 -o /dev/null -w "docker -> %{http_code}\n" https://get.docker.com
+curl -x http://proxy.rrze.uni-erlangen.de:80 -sS -m 15 -o /dev/null -w "google -> %{http_code}\n" https://generativelanguage.googleapis.com
+```
+
+✓ `docker -> 200` and `google -> 404` are **both good** (404 just means you
+reached Google and there's no page at the bare URL — the connection works).
+✗ `000`/`Failed to connect` → wrong proxy for your VLAN; get the right one from IT.
+
+**Set the proxy for your shell + apt** (this is what unblocks Docker install):
+
+```bash
+P=http://proxy.rrze.uni-erlangen.de:80
+NP="localhost,127.0.0.1,::1,qdrant,.rrze.uni-erlangen.de,.uni-erlangen.de,.fau.de,10.0.0.0/8"
+
+# this shell, now:
+export http_proxy=$P https_proxy=$P HTTP_PROXY=$P HTTPS_PROXY=$P no_proxy=$NP NO_PROXY=$NP
+
+# persist for future logins:
+cat >> /etc/environment <<EOF
+http_proxy="$P"
+https_proxy="$P"
+HTTP_PROXY="$P"
+HTTPS_PROXY="$P"
+no_proxy="$NP"
+NO_PROXY="$NP"
+EOF
+
+# apt:
+printf 'Acquire::http::Proxy "%s";\nAcquire::https::Proxy "%s";\n' "$P" "$P" > /etc/apt/apt.conf.d/95proxy
+```
+
+> ⚠️ `no_proxy`/`NO_PROXY` **must** include `localhost`, `127.0.0.1`, and
+> `qdrant` — otherwise `curl localhost:8080/health` and the server→database
+> calls would be sent to the internet proxy and fail.
 
 ---
 
-## Phase 2 — Update the system and install basics
-
-Everything from here runs **on the VM**.
+## Phase 3 — Install system basics + Docker
 
 ```bash
-sudo apt update
-sudo apt -y upgrade
-sudo apt install -y curl git jq ca-certificates
+apt-get update
+apt-get install -y curl git jq ca-certificates
 ```
 
-✓ **Checkpoint:**
-
-```bash
-curl --version | head -1
-git --version
-jq --version
-```
-
-Each prints a version line.
-
----
-
-## Phase 3 — Install Docker + Compose
+Install Docker (works now because the proxy is set):
 
 ```bash
 curl -fsSL https://get.docker.com -o get-docker.sh
-sudo sh get-docker.sh
+sh get-docker.sh
 ```
 
-Let your user run Docker without `sudo`, then apply it by reconnecting:
+*(Non-root only:* `sudo usermod -aG docker $USER`, then `exit` and SSH back in.*)*
+
+✓ Verify:
 
 ```bash
-sudo usermod -aG docker $USER
-exit
-```
-
-Reconnect:
-
-```bash
-ssh VM_USER@VM_IP
-```
-
-Make Docker start on boot, and verify:
-
-```bash
-sudo systemctl enable docker
-docker run --rm hello-world
+docker --version
 docker compose version
 ```
 
-✓ **Checkpoint:** you see `Hello from Docker!` and a `Docker Compose version v2.x`.
-
 ---
 
-## Phase 4 — (Optional) Install Python 3
+## Phase 4 — Point Docker at the proxy (skip if you have direct internet)
 
-> **You can skip this.** The MCP server runs inside Docker with its own Python.
-> Install Python on the VM **only** if you also want to run Python admin/ingest
-> tooling directly here.
+The Docker **daemon** and **builds** don't read your shell variables — they each
+need their own proxy config, or `docker pull`/`docker build` will hang.
 
 ```bash
-sudo apt install -y python3 python3-pip python3-venv
-python3 --version
+P=http://proxy.rrze.uni-erlangen.de:80
+
+# daemon proxy (for pulling images):
+mkdir -p /etc/systemd/system/docker.service.d
+printf '[Service]\nEnvironment="HTTP_PROXY=%s"\nEnvironment="HTTPS_PROXY=%s"\nEnvironment="NO_PROXY=localhost,127.0.0.1,::1,qdrant"\n' "$P" "$P" \
+  > /etc/systemd/system/docker.service.d/http-proxy.conf
+
+# build proxy (for the image's pip install):
+mkdir -p /root/.docker
+printf '{"proxies":{"default":{"httpProxy":"%s","httpsProxy":"%s","noProxy":"localhost,127.0.0.1,::1,qdrant"}}}\n' "$P" "$P" \
+  > /root/.docker/config.json
+
+systemctl daemon-reload && systemctl restart docker
 ```
 
-✓ **Checkpoint:** prints `Python 3.10`+ (any 3.10+ is fine).
+✓ Verify the daemon can pull through the proxy:
+
+```bash
+docker run --rm hello-world          # → "Hello from Docker!"
+```
 
 ---
 
 ## Phase 5 — Get the project onto the VM
 
-**Option A — clone from GitHub** (the repo is **private**, so this asks for a
-GitHub username + a Personal Access Token, not a password — create one at
-<https://github.com/settings/tokens>):
+The repo is **private**, so a plain `git clone` on the VM will prompt for a
+GitHub login. Pick the easiest path:
+
+**Option A — `git clone`** (needs a GitHub **Personal Access Token** as the
+password, from <https://github.com/settings/tokens> — *or* ask the repo owner to
+make it public, then no login is needed):
 
 ```bash
 cd ~
@@ -142,63 +179,52 @@ git clone https://github.com/mehrpad/MSEI_mcp_server.git
 cd MSEI_mcp_server
 ```
 
-**Option B — copy from your computer** (no GitHub needed). Run this **on your
-computer**, then come back to the VM:
+**Option B — copy from your own PC** (no GitHub needed; the repo is already at
+`E:\MSEI_mcp_server`). Run **on your PC**, then `cd ~/MSEI_mcp_server` on the VM:
 
-```bash
+```powershell
 scp -r "E:\MSEI_mcp_server" VM_USER@VM_IP:~/MSEI_mcp_server
 ```
 
-Then on the VM: `cd ~/MSEI_mcp_server`.
-
-✓ **Checkpoint:**
-
-```bash
-ls
-```
-
-shows `docker-compose.yml`, `mcp_server`, `docs`, `scripts`.
+✓ `ls` shows `docker-compose.yml`, `mcp_server`, `docs`, `scripts`.
 
 ---
 
-## Phase 6 — Set up the Google API key
-
-### 6a. Create the key
-In a browser: go to <https://aistudio.google.com/apikey> → sign in → **Create API
-key** → copy it (`GEMINI_KEY`).
-
-### 6b. Check the VM can reach Google
+## Phase 6 — Configure `.env` (Google key + runtime proxy)
 
 ```bash
-curl -s -o /dev/null -w "%{http_code}\n" https://generativelanguage.googleapis.com
-```
-
-✓ A number like `404` or `200` = **good** (you reached Google).
-✗ Hangs or `Could not resolve host` = the VM has no internet to Google — fix the
-firewall (see [docs/05](docs/05-google-api-key.md)) before continuing.
-
-### 6c. Create your `.env` and paste the key
-
-```bash
+cd ~/MSEI_mcp_server
 cp .env.example .env
 nano .env
 ```
 
-In nano, change this one line (replace with your real key):
+Set this one line (your AI Studio key — the **same** key does embeddings, no
+separate key needed):
 
 ```
 GEMINI_API_KEY=GEMINI_KEY
 ```
 
-Save and exit: `Ctrl+O`, `Enter`, `Ctrl+X`.
-
-✓ **Checkpoint:**
+Save (`Ctrl+O`, `Enter`, `Ctrl+X`). Then, **if behind a proxy**, append the
+runtime proxy so the running server can reach Google while keeping Qdrant direct:
 
 ```bash
-grep GEMINI_API_KEY .env
+cat >> .env <<'EOF'
+
+HTTP_PROXY=http://proxy.rrze.uni-erlangen.de:80
+HTTPS_PROXY=http://proxy.rrze.uni-erlangen.de:80
+NO_PROXY=localhost,127.0.0.1,::1,qdrant
+EOF
 ```
 
-shows your key (not the placeholder).
+✓ Check the active lines (no leftover placeholder):
+
+```bash
+grep -v '^\s*#' .env | grep .
+```
+
+You should see your real `GEMINI_API_KEY`, `COLLECTION_PREFIX=materials_v2`,
+`EMBED_MODEL=gemini-embedding-2-preview`, `HOST_PORT=8080`, and the 3 proxy lines.
 
 ---
 
@@ -206,58 +232,38 @@ shows your key (not the placeholder).
 
 ```bash
 docker compose up -d qdrant
+curl http://localhost:6333/healthz       # → "healthz check passed"
+curl http://localhost:6333/collections   # → empty list (correct, no data yet)
 ```
-
-(First run downloads the Qdrant image — give it a minute.)
-
-✓ **Checkpoint:**
-
-```bash
-curl http://localhost:6333/healthz
-curl http://localhost:6333/collections
-```
-
-First prints `healthz check passed`; second shows an **empty** collection list —
-correct, we load data next.
 
 ---
 
 ## Phase 8 — Transfer the vector database to the VM
 
-The `BUNDLE` is on **your own computer**. Copy it up — run this **on your
-computer**:
+Copy the `BUNDLE` from your PC (**run on your PC**):
 
-```bash
+```powershell
 scp "C:\path\to\BUNDLE" VM_USER@VM_IP:~/
 ```
 
-(macOS/Linux: `scp ~/Downloads/BUNDLE VM_USER@VM_IP:~/`)
-
-Back on the **VM**, unpack it:
+Unpack it on the **VM**:
 
 ```bash
-cd ~
-mkdir -p snapshots
+cd ~ && mkdir -p snapshots
 tar -xzf BUNDLE -C snapshots
-ls -lh snapshots
+ls -lh snapshots          # → four .snapshot files + RESTORE.md
 ```
-
-✓ **Checkpoint:** you see four `.snapshot` files (text, figures, tables,
-summaries) and a `RESTORE.md`.
 
 ---
 
-## Phase 9 — Add the data to Qdrant (restore)
+## Phase 9 — Restore the data + start the MCP server
 
 ```bash
 cd ~/MSEI_mcp_server
 bash scripts/restore-snapshot.sh ~/snapshots
 ```
 
-Each collection uploads and ends with `"result": true`. Large corpora take a
-while — let it finish.
-
-✓ **Checkpoint — confirm the data is in:**
+✓ Confirm data loaded (non-zero counts):
 
 ```bash
 for c in materials_v2 materials_v2_figures materials_v2_tables materials_v2_summaries; do
@@ -265,88 +271,46 @@ for c in materials_v2 materials_v2_figures materials_v2_tables materials_v2_summ
 done
 ```
 
-You should see **non-zero** numbers for each.
-
-> If your snapshot collections are named with a different prefix (e.g.
-> `materials_v2_external_*`), open `.env` and set `COLLECTION_PREFIX` to that
-> prefix. Default is `materials_v2`.
-
----
-
-## Phase 10 — Start the MCP server
+Start the server (first run **builds** the image — a few minutes, through the
+proxy):
 
 ```bash
 docker compose up -d
-```
-
-(First run **builds** the server image — a few minutes.)
-
-✓ **Checkpoint:**
-
-```bash
 docker compose ps
-curl http://localhost:8080/health
+curl http://localhost:8080/health        # → {"status":"ok", ... "prefix":"materials_v2"}
 ```
-
-Both containers are **running**; health returns
-`{"status": "ok", "server": "paperRAG-v2", "prefix": "materials_v2"}`.
-
-Find the address users will connect to:
-
-```bash
-hostname -I
-```
-
-The first address (e.g. `VM_IP`) → users connect to **`http://VM_IP:8080/mcp`**.
 
 ---
 
-## Phase 11 — Lock the server to your subnet
+## Phase 10 — Lock the server to your subnet
 
-Replace `SUBNET` with your real range. (Docker bypasses `ufw` for published
-ports, so we use the `DOCKER-USER` rule — order matters, run as shown.)
-
-```bash
-sudo iptables -I DOCKER-USER -p tcp --dport 8080 -s SUBNET -j RETURN
-sudo iptables -I DOCKER-USER -p tcp --dport 8080 -j DROP
-sudo apt install -y iptables-persistent
-sudo netfilter-persistent save
-```
-
-Protect SSH too:
+Docker bypasses `ufw` for published ports, so use the `DOCKER-USER` chain
+(order matters — run as shown). Replace `SUBNET`:
 
 ```bash
-sudo ufw allow OpenSSH
-sudo ufw --force enable
+iptables -I DOCKER-USER -p tcp --dport 8080 -s SUBNET -j RETURN
+iptables -I DOCKER-USER -p tcp --dport 8080 -j DROP
+apt-get install -y iptables-persistent
+netfilter-persistent save
+ufw allow OpenSSH && ufw --force enable
 ```
 
-✓ **Checkpoint:** from a computer **on your subnet**,
-`curl http://VM_IP:8080/health` works; from outside, it does not.
+✓ From a PC **on your subnet**, `curl http://VM_IP:8080/health` works; from
+outside, it doesn't.
 
 ---
 
-## Phase 12 — First test with OpenCode
+## Phase 11 — First test with OpenCode
 
-This part runs on a **user's own computer** (yours, for the test) — not the VM.
-
-### 12a. Watch the server (optional, on the VM)
-In your VM session, start streaming logs so you can see the test arrive:
+On a **user's PC** (not the VM). Watch the server log on the VM first:
 
 ```bash
-docker compose logs -f mcp
+docker compose logs -f mcp        # leave running; Ctrl+C to stop watching
 ```
 
-(Leave this running; `Ctrl+C` later to stop watching.)
-
-### 12b. Configure OpenCode (on your computer)
-Make sure OpenCode is installed (<https://opencode.ai>) and your local model
-works. Then open (create if missing):
-
-- macOS/Linux: `~/.config/opencode/opencode.json`
-- Windows: `%USERPROFILE%\.config\opencode\opencode.json`
-
-Paste this, replacing `VM_IP` and the `X-User` name (there's a ready copy in
-[`client-config/opencode.example.json`](client-config/opencode.example.json)):
+On the PC, in OpenCode's config (`~/.config/opencode/opencode.json`, or
+`%USERPROFILE%\.config\opencode\opencode.json` on Windows) — there's a copy in
+[`client-config/opencode.example.json`](client-config/opencode.example.json):
 
 ```json
 {
@@ -362,31 +326,18 @@ Paste this, replacing `VM_IP` and the `X-User` name (there's a ready copy in
 }
 ```
 
-Save the file.
-
-### 12c. Run the first searches
 Restart OpenCode, then ask:
 
-> **"Call corpus_stats on msei-papers."**
+> *"Call corpus_stats on msei-papers."* → paper/figure/table counts.
+> *"Search the papers for rhenium's effect on creep in Ni-base superalloys; give DOIs."*
 
-You should get paper / chunk / figure / table counts. Then a real search:
-
-> **"Search the papers for the effect of rhenium on creep resistance in
-> nickel-base superalloys. Give the top passages with their DOIs."**
-
-OpenCode returns quoted passages with citations from your library.
-
-✓ **On the VM log window** you'll see the request arrive, e.g.:
-
-```json
-{"ts":"...","ip":"VM_IP_of_your_PC","user":"your.name","method":"POST","path":"/mcp","auth":"open"}
-```
-
-🎉 **That's the whole system working end to end.**
+✓ On the VM log you'll see the request arrive with the user's IP + name. 🎉
+**That's the whole system working — including the server reaching Google through
+the proxy.**
 
 ---
 
-## You're done — quick reference
+## Quick reference
 
 | Task | Command (on the VM, in `~/MSEI_mcp_server`) |
 |------|---------------------------------------------|
@@ -398,29 +349,21 @@ OpenCode returns quoted passages with citations from your library.
 | Stop (keep data) | `docker compose down` |
 | Start again | `docker compose up -d` |
 
-**Next steps & deeper topics:**
-- Update / add / swap a corpus → [docs/08](docs/08-update-add-database.md)
-- Backups, troubleshooting, reboots → [docs/09](docs/09-operations-troubleshooting.md)
-- Turn on per-user API tokens → [docs/10](docs/10-api-token-auth.md)
-- Hand users the short version → [client-config/README.md](client-config/README.md)
+**Next:** update/swap a corpus → [docs/08](docs/08-update-add-database.md) ·
+backups & troubleshooting → [docs/09](docs/09-operations-troubleshooting.md) ·
+per-user tokens → [docs/10](docs/10-api-token-auth.md) ·
+proxy details → [docs/11](docs/11-proxy-setup.md).
 
 ---
 
-### Fast path (for the next VM, if you already know the above)
+## Where this differs from a "normal" (direct-internet) VM
 
-```bash
-ssh VM_USER@VM_IP
-sudo apt update && sudo apt install -y curl git jq
-curl -fsSL https://get.docker.com | sudo sh
-sudo usermod -aG docker $USER && exit
-# reconnect:
-ssh VM_USER@VM_IP
-git clone https://github.com/mehrpad/MSEI_mcp_server.git && cd MSEI_mcp_server
-cp .env.example .env && nano .env            # set GEMINI_API_KEY
-docker compose up -d qdrant
-# copy BUNDLE up (from your PC): scp BUNDLE VM_USER@VM_IP:~/
-mkdir -p ~/snapshots && tar -xzf ~/BUNDLE -C ~/snapshots
-bash scripts/restore-snapshot.sh ~/snapshots
-docker compose up -d
-curl http://localhost:8080/health
-```
+If a future VM has direct internet, **skip Phases 2 and 4** entirely and drop the
+proxy lines from `.env` in Phase 6 — everything else is identical.
+
+The five places the proxy must be set (the thing that trips everyone up):
+1. shell (`/etc/environment`) — Phase 2
+2. apt (`/etc/apt/apt.conf.d/95proxy`) — Phase 2
+3. Docker daemon (`docker.service.d/http-proxy.conf`) — Phase 4
+4. Docker build (`/root/.docker/config.json`) — Phase 4
+5. MCP container runtime (`.env`) — Phase 6
