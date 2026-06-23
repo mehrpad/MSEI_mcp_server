@@ -21,8 +21,11 @@ Protocol (MCP)**.
 - **Users are identified** by IP + a self-declared `X-User` header (audit-logged).
   The VM is reached only from the group's subnet (firewall).
 
-> **New here? Start with [`docs/00-overview.md`](docs/00-overview.md).** The docs
-> are written for someone who has never used Linux, step by step.
+> **New here?**
+> - **One-shot linear runbook (zero → working search):** [`INSTALL.md`](INSTALL.md)
+> - **Per-topic guide, with troubleshooting:** [`docs/00-overview.md`](docs/00-overview.md)
+>
+> Both are written for someone who has never used Linux, step by step.
 
 ---
 
@@ -84,6 +87,7 @@ see [`docs/10`](docs/10-api-token-auth.md).
 ```
 MSEI_mcp_server/
 ├── README.md                  ← you are here
+├── INSTALL.md                 ← one-shot, line-by-line setup walkthrough
 ├── docker-compose.yml         ← Qdrant + MCP server
 ├── .env.example               ← copy to .env, set your key
 ├── mcp_server/
