@@ -71,8 +71,12 @@ cd ~/MSEI_mcp_server
 bash scripts/restore-snapshot.sh ~/snapshots
 ```
 
-You'll see one block per collection ending in `"result": true`. Each upload can
-take a while for a large corpus — let it finish.
+You'll see one block per collection ending in `"result": true`.
+
+> ⚠️ **A multi-GB snapshot takes minutes and looks frozen while it loads.** Let
+> each one finish — **do not press Ctrl-C**, or that collection ends up empty and
+> you'll have to start it over. To watch progress, open a second SSH session and
+> run `docker compose logs -f qdrant`.
 
 <details>
 <summary>What the script runs under the hood (if you prefer to do it by hand)</summary>

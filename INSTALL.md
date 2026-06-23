@@ -232,9 +232,15 @@ You should see your real `GEMINI_API_KEY`, `COLLECTION_PREFIX=materials_v2`,
 
 ```bash
 docker compose up -d qdrant
+sleep 5                                   # give Qdrant a moment to be ready
 curl http://localhost:6333/healthz       # → "healthz check passed"
 curl http://localhost:6333/collections   # → empty list (correct, no data yet)
 ```
+
+> This repo **pins Qdrant to v1.16.0** on purpose: v1.17+ removed RocksDB and
+> can't restore older RocksDB-format snapshots (`unknown variant rocks_db`).
+> If the *first* health call says `Connection reset by peer`, Qdrant just wasn't
+> up yet — wait a few seconds and retry.
 
 ---
 
@@ -270,22 +276,43 @@ ls -lh ~/snapshots
 
 ## Phase 9 — Restore the data + start the MCP server
 
-The restore script reads the **collection name out of each filename
-automatically** (it understands the `materials_v2-<id>-<date>.snapshot` format):
+> ⚠️ **Big snapshots take minutes and look frozen while loading.** Restore **one
+> file at a time**, wait for each to print `{"result":true,...}`, and **do NOT
+> press Ctrl-C** — interrupting leaves the collection empty and you start over.
+
+Easiest — the script reads the collection name from each filename automatically:
 
 ```bash
 cd ~/MSEI_mcp_server
 bash scripts/restore-snapshot.sh ~/snapshots
 ```
 
-<details><summary>Or restore each file explicitly (you name the collection yourself — foolproof)</summary>
+Or restore each file yourself, one at a time. The `-w` line prints how long it
+took, so you know it actually finished (vs. froze):
 
 ```bash
-Q=http://localhost:6333
-curl -sS -X POST "$Q/collections/materials_v2/snapshots/upload?priority=snapshot" \
-  -F "snapshot=@$HOME/snapshots/materials_v2-2819031290988516-2026-05-27-12-40-06.snapshot"; echo
-curl -sS -X POST "$Q/collections/materials_v2_summaries/snapshots/upload?priority=snapshot" \
-  -F "snapshot=@$HOME/snapshots/materials_v2_summaries-2819031290988516-2026-05-27-12-41-41.snapshot"; echo
+# big file first — several minutes is normal; leave it alone until it returns:
+curl -sS -X POST "http://localhost:6333/collections/materials_v2/snapshots/upload?priority=snapshot" \
+  -F "snapshot=@$HOME/snapshots/materials_v2-2819031290988516-2026-05-27-12-40-06.snapshot" \
+  -w "\n-> HTTP %{http_code} in %{time_total}s\n"
+
+# then the smaller one:
+curl -sS -X POST "http://localhost:6333/collections/materials_v2_summaries/snapshots/upload?priority=snapshot" \
+  -F "snapshot=@$HOME/snapshots/materials_v2_summaries-2819031290988516-2026-05-27-12-41-41.snapshot" \
+  -w "\n-> HTTP %{http_code} in %{time_total}s\n"
+```
+
+> **See it working** (optional): in a *second* SSH session, run
+> `docker compose -f ~/MSEI_mcp_server/docker-compose.yml logs -f qdrant`.
+
+<details><summary>Huge file won't upload over HTTP? Recover from disk instead (no long upload)</summary>
+
+```bash
+docker exec msei-qdrant mkdir -p /qdrant/snapshots/materials_v2
+docker cp ~/snapshots/materials_v2-2819031290988516-2026-05-27-12-40-06.snapshot msei-qdrant:/qdrant/snapshots/materials_v2/
+curl -sS -X PUT "http://localhost:6333/collections/materials_v2/snapshots/recover" \
+  -H 'Content-Type: application/json' \
+  -d '{"location":"file:///qdrant/snapshots/materials_v2/materials_v2-2819031290988516-2026-05-27-12-40-06.snapshot","priority":"snapshot"}'
 ```
 </details>
 
