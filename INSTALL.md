@@ -359,38 +359,94 @@ outside, it doesn't.
 
 ## Phase 11 — First test with OpenCode
 
-On a **user's PC** (not the VM). Watch the server log on the VM first:
+On a **user's PC** (not the VM). OpenCode's config needs two things: a **model
+provider** (here the NHR@FAU gateway) and the **paper server** (`mcp`).
 
-```bash
-docker compose logs -f mcp        # leave running; Ctrl+C to stop watching
+### 11a. Set your NHR@FAU API token (PowerShell, Windows)
+
+The config reads the token from an environment variable so it never sits in the
+file. Get your token from the NHR portal, then in **PowerShell**:
+
+```powershell
+# current session — THE QUOTES ARE REQUIRED:
+$env:NHR_API_TOKEN="PASTE_YOUR_TOKEN_HERE"
+
+# verify:
+echo $env:NHR_API_TOKEN
+
+# make it permanent (applies to NEW terminals / after restarting OpenCode):
+setx NHR_API_TOKEN "PASTE_YOUR_TOKEN_HERE"
 ```
 
-On the PC, in OpenCode's config (`~/.config/opencode/opencode.json`, or
-`%USERPROFILE%\.config\opencode\opencode.json` on Windows) — there's a copy in
-[`client-config/opencode.example.json`](client-config/opencode.example.json):
+> ⚠️ **Use the quotes.** `$env:NHR_API_TOKEN="..."` works; `$env:NHR_API_TOKEN=...`
+> (no quotes) fails. `setx` only affects **future** terminals, so **restart
+> OpenCode** afterwards.
+> 🔒 **Never put the token in the config file, a screenshot, or chat.** If it's
+> ever exposed, **regenerate it in the NHR portal** and set the new one.
+>
+> macOS/Linux: `export NHR_API_TOKEN="..."` (add it to `~/.bashrc` / `~/.zshrc`).
+
+### 11b. Configure OpenCode
+
+Edit OpenCode's config — `%USERPROFILE%\.config\opencode\opencode.json` (Windows)
+or `~/.config/opencode/opencode.json` (macOS/Linux). Replace the **whole file**
+with this (also saved in
+[`client-config/opencode.example.json`](client-config/opencode.example.json)):
 
 ```json
 {
   "$schema": "https://opencode.ai/config.json",
+  "model": "nhr-fau/gpt-oss-120b",
+  "provider": {
+    "nhr-fau": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "NHR@FAU",
+      "options": {
+        "baseURL": "https://hub.nhr.fau.de/api/llmgw/v1",
+        "apiKey": "{env:NHR_API_TOKEN}"
+      },
+      "models": {
+        "gpt-oss-120b": { "name": "gpt-oss-120b" },
+        "Kimi-K2.6": { "name": "Kimi-K2.6" },
+        "DeepSeek-V4-Flash": { "name": "DeepSeek-V4-Flash" },
+        "Mistral-Medium-3.5-128B": { "name": "Mistral-Medium-3.5-128B" },
+        "gemma-4-E4B-it": { "name": "gemma-4-E4B-it" }
+      }
+    }
+  },
   "mcp": {
     "msei-papers": {
       "type": "remote",
-      "url": "http://VM_IP:8080/mcp",
+      "url": "http://10.76.33.35:8080/mcp",
       "enabled": true,
-      "headers": { "X-User": "your.name" }
+      "headers": { "X-User": "mehrpad" }
     }
   }
 }
 ```
 
+- `model` = the default model, written `provider-id/model-id` (`nhr-fau/gpt-oss-120b`).
+- `apiKey: "{env:NHR_API_TOKEN}"` pulls the token from the env var set in 11a.
+- Change `"X-User": "mehrpad"` to each person's name (how they show up in the log).
+- **One outer `{ }`** — `model`, `provider`, `mcp` are siblings (commas between, no
+  stray braces). An `EndOfFileExpected` error means a brace closed the file early.
+
+### 11c. Watch the server (optional, on the VM)
+
+```bash
+docker compose logs -f mcp        # leave running; Ctrl+C stops watching
+```
+
+### 11d. Test
+
 Restart OpenCode, then ask:
 
-> *"Call corpus_stats on msei-papers."* → paper/figure/table counts.
+> *"Call corpus_stats on msei-papers."* → counts (~351k chunks, ~31k summaries).
 > *"Search the papers for rhenium's effect on creep in Ni-base superalloys; give DOIs."*
 
-✓ On the VM log you'll see the request arrive with the user's IP + name. 🎉
-**That's the whole system working — including the server reaching Google through
-the proxy.**
+✓ On the VM log you'll see the request arrive with the user's IP + `X-User`. 🎉
+**The whole system working end-to-end** — model via NHR@FAU, paper search via the
+MCP server, embeddings via Google through the proxy.
 
 ---
 
