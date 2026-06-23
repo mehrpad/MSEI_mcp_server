@@ -19,7 +19,11 @@ import os
 import sys
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
+
+# A keyword/metadata filter: a JSON array of conditions, accepted either as a
+# native list (what most models pass) or a JSON-encoded string (back-compat).
+WhereFilter = Optional[Union[str, List[Dict[str, Any]]]]
 
 # Optional .env loading — convenient when running the server directly (not in
 # Docker). Harmless if python-dotenv is missing: Docker/compose inject the same
@@ -200,7 +204,7 @@ KEYWORD_GROUPS = {
 
 # ── Qdrant filter builder ────────────────────────────────────────────────
 
-def _build_qdrant_filter(where: Optional[str]) -> Optional[qm.Filter]:
+def _build_qdrant_filter(where: WhereFilter) -> Optional[qm.Filter]:
     """Convert a JSON where clause to a Qdrant Filter.
 
     where format (JSON array of conditions):
@@ -400,7 +404,7 @@ def build_server(
     def search_text(
         query: str,
         top_k: int = 10,
-        where: Optional[str] = None,
+        where: WhereFilter = None,
         group_by: Optional[str] = None,
         snippet_chars: int = 500,
     ) -> Dict[str, Any]:
@@ -474,7 +478,7 @@ def build_server(
     def search_figures(
         query: str,
         top_k: int = 10,
-        where: Optional[str] = None,
+        where: WhereFilter = None,
         search_mode: str = "text",
     ) -> Dict[str, Any]:
         """Search figures by text description OR by image similarity.
@@ -531,7 +535,7 @@ def build_server(
     def search_tables(
         query: str,
         top_k: int = 10,
-        where: Optional[str] = None,
+        where: WhereFilter = None,
     ) -> Dict[str, Any]:
         """Search for tables by description. Returns actual CSV data.
 
@@ -583,7 +587,7 @@ def build_server(
     def search_papers(
         query: str = "",
         top_k: int = 10,
-        where: Optional[str] = None,
+        where: WhereFilter = None,
     ) -> Dict[str, Any]:
         """Paper-level coarse search across summaries.
 
@@ -655,7 +659,7 @@ def build_server(
     def evidence_pack(
         question: str,
         top_k: int = 5,
-        where: Optional[str] = None,
+        where: WhereFilter = None,
     ) -> Dict[str, Any]:
         """Multi-collection evidence gathering. Searches chunks + tables + figures simultaneously.
 
@@ -1347,7 +1351,7 @@ def build_server(
     def search_by_properties(
         property_type: str,
         alloy_system: Optional[str] = None,
-        where: Optional[str] = None,
+        where: WhereFilter = None,
         top_k: int = 10,
     ) -> Dict[str, Any]:
         """Find papers reporting specific property measurements.
@@ -1421,7 +1425,7 @@ def build_server(
     def find_similar_images(
         image_path: str,
         top_k: int = 10,
-        where: Optional[str] = None,
+        where: WhereFilter = None,
         text: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Find visually similar figures across the corpus.
@@ -1486,7 +1490,7 @@ def build_server(
     @mcp.tool()
     def facet_counts(
         field: str,
-        where: Optional[str] = None,
+        where: WhereFilter = None,
         top_n: int = 20,
     ) -> Dict[str, Any]:
         """Count distribution of any keyword/metadata field.
