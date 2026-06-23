@@ -42,6 +42,25 @@ prompt looks like `VM_USER@...:~$`.
 
 ---
 
+## Phase 1b — If the VM has no direct internet (proxy)
+
+**Test first** (fast-fail):
+
+```bash
+curl -sS -m 8 -o /dev/null -w "%{http_code}\n" https://get.docker.com || echo "BLOCKED"
+```
+
+- Returns `200`/`301` → you have direct internet. **Skip to Phase 2.**
+- Hangs/`BLOCKED`/timeout → you're behind a proxy (normal on FAU/RRZE). **Do the
+  full proxy setup now: [docs/11-proxy-setup.md](docs/11-proxy-setup.md)**, then
+  come back. On FAU the proxy is `http://proxy.rrze.uni-erlangen.de:80` and it
+  must be set in five places (shell, apt, Docker daemon, build, and the server's
+  runtime `.env`) — docs/11 has every command.
+
+> Phases 2–3 below assume the proxy is already configured if you needed it.
+
+---
+
 ## Phase 2 — Update the system and install basics
 
 Everything from here runs **on the VM**.
