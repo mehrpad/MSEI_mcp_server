@@ -11,7 +11,11 @@ name: msei-paperrag
 services:
   # ── Vector database ─────────────────────────────────────────────────────
   qdrant:
-    image: qdrant/qdrant:latest
+    # PINNED on purpose. Qdrant v1.17+ removed RocksDB and cannot restore older
+    # RocksDB-format snapshots (fails with: unknown variant `rocks_db`).
+    # v1.16.x is the last release that reads them. Only move to a newer version
+    # after re-creating the snapshots on a newer Qdrant. See docs/04 + docs/09.
+    image: qdrant/qdrant:v1.16.0
     container_name: msei-qdrant
     restart: unless-stopped
     volumes:

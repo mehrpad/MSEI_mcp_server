@@ -113,6 +113,7 @@ then `docker compose ps` to confirm both are back. If not: `docker compose up -d
 | Users can't connect | Firewall/subnet or wrong URL | From a user machine: `curl http://<VM-IP>:8080/health`. Re-check [step 06 §3](06-run-mcp-server.md#3-lock-down-the-network-important). |
 | `no space left on device` | Disk full (snapshots, old DBs, logs) | `df -h`; delete old databases ([step 08 §D](08-update-add-database.md#scenario-d--delete-a-collection--database-free-disk-space)); remove old snapshot files. |
 | Qdrant won't start | Corrupted/locked storage, or port in use | `docker compose logs qdrant`; ensure nothing else uses 6333. |
+| Restore fails: `unknown variant `rocks_db`` | Snapshot is RocksDB-format; Qdrant **v1.17+ removed RocksDB** | Use `qdrant/qdrant:v1.16.0` (this repo is pinned to it). To re-fix after a bad attempt: `docker compose down -v && docker compose up -d qdrant`, then restore again. |
 | Everything is slow | Many concurrent searches, or a huge corpus on a small VM | Check load with `docker stats`; consider more vCPU/RAM. |
 | Container says "unhealthy" | App not answering /health yet, or crashed | Give it 30s; if it persists, read the logs. |
 

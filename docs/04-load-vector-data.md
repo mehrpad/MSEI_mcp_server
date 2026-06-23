@@ -126,8 +126,9 @@ The server serves whichever collection **prefix** is named in `.env`. Open it:
 nano .env
 ```
 
-Make sure this line matches the collection names you just restored (the part
-before `__`, without the `_figures`/`_tables`/`_summaries` suffix):
+Make sure this line matches the collections you just restored — the base name
+without the `_figures`/`_tables`/`_summaries` suffix (for the example files,
+that's `materials_v2`):
 
 ```
 COLLECTION_PREFIX=materials_v2
@@ -135,8 +136,9 @@ COLLECTION_PREFIX=materials_v2
 
 Save (`Ctrl+O`, `Enter`) and exit (`Ctrl+X`).
 
-> If your snapshots were named `materials_v2_external_2026_05_28__...`, then set
-> `COLLECTION_PREFIX=materials_v2_external_2026_05_28`.
+> If your snapshots were for a different corpus, e.g.
+> `materials_v2_external-<id>-<date>.snapshot`, set
+> `COLLECTION_PREFIX=materials_v2_external`.
 
 ---
 
@@ -144,8 +146,9 @@ Save (`Ctrl+O`, `Enter`) and exit (`Ctrl+X`).
 
 | Symptom | Fix |
 |---------|-----|
-| `404` or `Collection not found` during restore | Normal — the upload **creates** the collection. If it persists, check the filename has a `__` separating collection name from snapshot name. |
-| `points_count` is 0 after restore | The snapshot was empty, or you restored the wrong file. Re-check the bundle. |
+| **`unknown variant `rocks_db`, expected `gridstore` or `mmap`** | Qdrant version mismatch: your snapshot is RocksDB-format and Qdrant **v1.17+ removed RocksDB**. Pin the image to `qdrant/qdrant:v1.16.0` in `docker-compose.yml`, then `docker compose down -v && docker compose up -d qdrant` and restore again. (This repo is already pinned to v1.16.0.) |
+| `404` or `Collection not found` during restore | Usually fine — the upload **creates** the collection. If it persists, check the collection name is the leading part of the filename. |
+| `points_count` is 0 after restore | The snapshot was empty, or you restored the wrong file. Re-check the file. |
 | Restore is very slow | Large corpora take time; the snapshot is being indexed. Watch progress with `docker compose logs -f qdrant`. |
 | `jq: command not found` | `sudo apt install -y jq` (just makes JSON readable; not required). |
 | Out of disk space | Check with `df -h`. Snapshots need roughly 2× the final data size while restoring. |
