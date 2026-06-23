@@ -1,6 +1,6 @@
-# MSEI paper-RAG server
+# MSEI publication-RAG server
 
-A shared, searchable library of the group's scientific papers — served to ~100
+A shared, searchable library of the group's scientific publications — served to ~100
 users who each run **OpenCode** with their **own local LLM**. The server turns
 questions into semantic searches over a **Qdrant** vector database and answers
 with real passages, tables, figures, and citations, over the **Model Context
@@ -9,7 +9,7 @@ Protocol (MCP)**.
 ```
   ~100 people, each on their own PC                  ONE shared Linux VM (private network)
   ┌─────────────────────────────┐                    ┌──────────────────────────────────┐
-  │  OpenCode + their local LLM  │  ─ MCP /HTTP ─▶    │  MCP server  ──▶  Qdrant (papers) │
+  │  OpenCode + their local LLM  │  ─ MCP /HTTP ─▶    │  MCP server  ──▶  Qdrant (publications) │
   └─────────────────────────────┘   :8080/mcp         │       │                           │
                                                       │       └──▶ Google embedding API   │
                                                       └──────────────────────────────────┘
@@ -49,7 +49,7 @@ git clone https://github.com/mehrpad/MSEI_mcp_server.git && cd MSEI_mcp_server
 cp .env.example .env && nano .env          # set GEMINI_API_KEY
 
 docker compose up -d qdrant                # 1) start the database
-bash scripts/restore-snapshot.sh ~/snapshots   # 2) load papers (snapshot bundle)
+bash scripts/restore-snapshot.sh ~/snapshots   # 2) load publications (snapshot bundle)
 docker compose up -d                       # 3) start the MCP server
 
 curl http://localhost:8080/health          # -> {"status":"ok", ...}
@@ -67,7 +67,7 @@ The full, beginner-proof version is the numbered guide in [`docs/`](docs/).
 ## What the server exposes
 
 A FastMCP server (Streamable HTTP) with **24 tools** over the corpus's four
-collections (text chunks, figures, tables, paper summaries): semantic search,
+collections (text chunks, figures, tables, publication summaries): semantic search,
 multi-collection evidence packs, keyword/metadata filtering, citation-graph
 queries, composition/property search, image similarity, facets, and corpus stats.
 Embeddings use Google `gemini-embedding-2-preview` (3072-dim, cosine). It also
@@ -131,8 +131,8 @@ MSEI_mcp_server/
 
 ## Credits
 
-The MCP server is built on the `paperRAG-v2` server from
-[AgentAugmentedAutonomousAcademic](https://github.com/peterfelfer/AgentAugmentedAutonomousAcademic),
-hardened here for multi-user OpenCode deployment (Streamable HTTP transport,
-environment-based config, collection-prefix switching, health checks, and IP +
-username audit logging).
+The MCP server is adapted from the `paperRAG-v2` server in
+[AgentAugmentedAutonomousAcademic](https://github.com/peterfelfer/AgentAugmentedAutonomousAcademic)
+(renamed here to `publicationRAG-v2`), hardened for multi-user OpenCode deployment
+(Streamable HTTP transport, environment-based config, collection-prefix switching,
+health checks, and IP + username audit logging).

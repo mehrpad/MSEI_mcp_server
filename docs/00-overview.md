@@ -1,7 +1,7 @@
 # 00 · Overview — what we are building and why
 
 > **Who this guide is for:** someone who has **never used Linux** before and has
-> been asked to set up the paper search system for the group. Every step is
+> been asked to set up the publication search system for the group. Every step is
 > spelled out. You can copy-paste every command. If you can read and type
 > carefully, you can do this.
 
@@ -9,20 +9,20 @@
 
 ## What is this thing?
 
-Our research group has a large library of scientific papers that has been turned
+Our research group has a large library of scientific publications that has been turned
 into a **searchable database** (a "vector database"). This lets an AI assistant
-find the *right* passages, figures, and tables from thousands of papers in
+find the *right* passages, figures, and tables from thousands of publications in
 seconds, and answer questions with real citations.
 
 You are setting up the **server** that makes this library available to everyone
 in the group. Each person uses a tool called **OpenCode** on their own computer,
 with their **own local AI model**, and connects to your server to search the
-papers.
+publications.
 
 ```
   ~100 people, each on their own PC                  ONE shared Linux server (the "VM")
   ┌─────────────────────────────┐                    ┌──────────────────────────────────┐
-  │  OpenCode + their local LLM  │  ── network ──▶    │  MCP server  ──▶  Qdrant (papers) │
+  │  OpenCode + their local LLM  │  ── network ──▶    │  MCP server  ──▶  Qdrant (publications) │
   └─────────────────────────────┘                    │       │                           │
                                                       │       └──▶ Google embedding API   │
                                                       └──────────────────────────────────┘
@@ -32,13 +32,13 @@ Three pieces live on the server:
 
 | Piece | Plain-English job | Runs as |
 |-------|-------------------|---------|
-| **Qdrant** | Stores the papers as searchable vectors. The "library". | Docker container |
+| **Qdrant** | Stores the publications as searchable vectors. The "library". | Docker container |
 | **MCP server** | The translator. Receives a question from OpenCode, turns it into a search, asks Qdrant, returns results. | Docker container |
 | **Google embedding API** | Turns text into numbers ("vectors") so it can be searched by meaning. Lives at Google; the server calls it over the internet. | External service (needs an API key) |
 
 **You do NOT install any AI model on the server.** The heavy AI work happens on
 each user's own computer (their local LLM) and at Google (embeddings). Your
-server just stores papers and searches them — so it can be a modest machine.
+server just stores publications and searches them — so it can be a modest machine.
 
 ---
 
@@ -46,7 +46,7 @@ server just stores papers and searches them — so it can be a modest machine.
 
 | Repo | What it does | Where it runs |
 |------|--------------|---------------|
-| **The ingest repo** (separate) | Turns PDF papers into Qdrant data and produces **snapshot** files. | On a powerful machine / your laptop, run by an admin. |
+| **The ingest repo** (separate) | Turns PDF publications into Qdrant data and produces **snapshot** files. | On a powerful machine / your laptop, run by an admin. |
 | **This repo** (`MSEI_mcp_server`) | Runs the server that the group searches every day. | On the **VM**. |
 
 In this guide you will **copy the snapshots produced by the ingest repo onto the
@@ -82,7 +82,7 @@ Do these in order. Each page ends by linking to the next.
 1. [01 · Linux basics](01-linux-basics.md) — connect to the VM and find your way around.
 2. [02 · Install Docker](02-install-docker.md) — the engine that runs everything.
 3. [03 · Start Qdrant](03-start-qdrant.md) — bring up the empty database.
-4. [04 · Load the paper data](04-load-vector-data.md) — copy snapshots to the VM and restore them.
+4. [04 · Load the publication data](04-load-vector-data.md) — copy snapshots to the VM and restore them.
 5. [05 · Google API key](05-google-api-key.md) — create and activate the embedding key.
 6. [06 · Run the MCP server](06-run-mcp-server.md) — start the server and lock down the firewall.
 7. [07 · Connect OpenCode](07-connect-opencode.md) — set up a user's computer and run a test search.
@@ -103,7 +103,7 @@ Do these in order. Each page ends by linking to the next.
 - **Docker:** software that runs apps in isolated boxes called **containers**, so
   you don't have to install messy dependencies by hand.
 - **Container:** one running app in its Docker box (we have two: `qdrant`, `mcp`).
-- **Qdrant:** the vector database that stores the papers.
+- **Qdrant:** the vector database that stores the publications.
 - **Vector / embedding:** a list of numbers representing the *meaning* of text, so
   search can match by meaning, not just keywords.
 - **MCP (Model Context Protocol):** the standard way AI tools like OpenCode talk to

@@ -23,7 +23,7 @@ All commands run **on the VM**, in `~/MSEI_mcp_server`.
 | Free disk space | `df -h` |
 
 > `docker compose down` stops the containers but **keeps your data** (it lives in
-> named volumes). Your papers are safe across restarts and reboots.
+> named volumes). Your publications are safe across restarts and reboots.
 
 ---
 

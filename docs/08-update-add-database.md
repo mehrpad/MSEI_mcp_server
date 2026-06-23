@@ -34,7 +34,7 @@ or, from OpenCode, ask the assistant to call **`list_databases`**.
 
 ## Scenario A — Update to a newer corpus (recommended: prefix swap)
 
-The ingest repo gives you a fresh bundle (more papers, better metadata). Load it
+The ingest repo gives you a fresh bundle (more publications, better metadata). Load it
 under a **new** prefix so the current one keeps working until you're happy.
 
 1. **Copy & unpack** the new bundle (as in [step 04](04-load-vector-data.md)).

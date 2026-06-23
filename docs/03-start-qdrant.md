@@ -1,7 +1,7 @@
 # 03 · Start Qdrant (the database)
 
 > Goal: get this project onto the VM and bring up the empty Qdrant database.
-> Next step (04) fills it with papers.
+> Next step (04) fills it with publications.
 
 All commands run **on the VM**.
 
@@ -125,6 +125,6 @@ waiting for data. 🎉
 
 ---
 
-✅ Qdrant is running but empty. Let's load the papers.
+✅ Qdrant is running but empty. Let's load the publications.
 
-⬅️ Back: [02 · Install Docker](02-install-docker.md)  ·  ➡️ Next: [04 · Load the paper data](04-load-vector-data.md)
+⬅️ Back: [02 · Install Docker](02-install-docker.md)  ·  ➡️ Next: [04 · Load the publication data](04-load-vector-data.md)

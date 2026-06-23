@@ -1,4 +1,4 @@
-# MSEI paper-RAG stack: Qdrant (vector DB) + the MCP server for OpenCode.
+# MSEI publication-RAG stack: Qdrant (vector DB) + the MCP server for OpenCode.
 #
 #   Start:   docker compose up -d
 #   Logs:    docker compose logs -f mcp

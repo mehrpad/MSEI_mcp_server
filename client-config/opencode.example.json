@@ -23,7 +23,7 @@
     }
   },
   "mcp": {
-    "msei-papers": {
+    "msei-publications": {
       "type": "remote",
       "url": "http://10.76.33.35:8080/mcp",
       "enabled": true,

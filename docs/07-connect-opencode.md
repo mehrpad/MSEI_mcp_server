@@ -70,7 +70,7 @@ Change the **`url`** to your VM and **`X-User`** to your name:
     }
   },
   "mcp": {
-    "msei-papers": {
+    "msei-publications": {
       "type": "remote",
       "url": "http://10.76.33.35:8080/mcp",
       "enabled": true,
@@ -86,7 +86,7 @@ Change the **`url`** to your VM and **`X-User`** to your name:
   good tool-caller (Qwen3.6 / DeepSeek); avoid `gpt-oss-120b`** (malformed tool-call
   ids → "Expected 'id' to be a string"), and never an embedding/OCR model.
 - `apiKey: "{env:NHR_API_TOKEN}"` — pulls the token you set in Step 1.
-- `mcp.msei-papers.url` — the VM address from the admin, ending in `/mcp`.
+- `mcp.msei-publications.url` — the VM address from the admin, ending in `/mcp`.
 - `headers.X-User` — how you show up in the server's audit log (honour-system
   label, not a password).
 
@@ -103,13 +103,13 @@ Save the file.
 Close and reopen OpenCode (or start a new session). The server's tools should now
 be available. Ask OpenCode something like:
 
-> *"Use the msei-papers tools. What's in the corpus? Call corpus_stats."*
+> *"Use the msei-publications tools. What's in the corpus? Call corpus_stats."*
 
-If it reports paper/chunk/figure/table counts, you're connected. 🎉
+If it reports publication/chunk/figure/table counts, you're connected. 🎉
 
 You can also ask it to list what's available:
 
-> *"List the available paper databases."* → it calls `list_databases`.
+> *"List the available publication databases."* → it calls `list_databases`.
 
 ---
 
@@ -117,7 +117,7 @@ You can also ask it to list what's available:
 
 Try a domain question, e.g.:
 
-> *"Search the papers for the effect of rhenium on creep resistance in
+> *"Search the publications for the effect of rhenium on creep resistance in
 > nickel-base superalloys. Give me the top passages with their DOIs."*
 
 OpenCode will call `search_text` (and maybe `evidence_pack`) and answer with
@@ -127,10 +127,10 @@ A few of the most useful tools the assistant can call:
 
 | Tool | Use it for |
 |------|-----------|
-| `search_text` | Main semantic search over paper passages. |
+| `search_text` | Main semantic search over publication passages. |
 | `evidence_pack` | Gather text + tables + figures for a research question at once. |
-| `search_papers` | Find whole papers by topic. |
-| `get_paper` / `get_paper_chunks` | Read everything about one paper (by DOI). |
+| `search_publications` | Find whole publications by topic. |
+| `get_publication` / `get_publication_chunks` | Read everything about one publication (by DOI). |
 | `search_tables` / `search_figures` | Find specific data tables or figures. |
 | `corpus_stats` / `list_keywords` | Understand what's in the library and how to filter. |
 
@@ -147,7 +147,7 @@ search, image similarity, and more.)
 > 3. Open `%USERPROFILE%\.config\opencode\opencode.json` and paste the ready file
 >    [`client-config/opencode.example.json`](../client-config/opencode.example.json);
 >    set your `X-User` name and the VM `url`.
-> 4. Restart OpenCode. Ask it to "call corpus_stats on msei-papers".
+> 4. Restart OpenCode. Ask it to "call corpus_stats on msei-publications".
 
 ---
 

@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""MCP server for Qdrant v2 vector store (paperRAG-v2).
+"""MCP server for Qdrant v2 vector store (publicationRAG-v2).
 
 Exposes 23 tools for interactive research sessions across 4 collections:
   - materials_v2           (text chunks)
   - materials_v2_figures   (figure images + captions)
   - materials_v2_tables    (table CSV data)
-  - materials_v2_summaries (paper-level summaries)
+  - materials_v2_summaries (publication-level summaries)
 
 Capabilities: semantic search, keyword pre-filtering, citation graph queries,
 cross-collection linking, image similarity search, structured table retrieval.
@@ -103,8 +103,8 @@ logging.basicConfig(
     format="%(asctime)s %(levelname)s %(name)s %(message)s",
     stream=sys.stderr,
 )
-log = logging.getLogger("paperRAG")
-audit = logging.getLogger("paperRAG.audit")
+log = logging.getLogger("publicationRAG")
+audit = logging.getLogger("publicationRAG.audit")
 if AUDIT_LOG:
     try:
         _h = logging.FileHandler(AUDIT_LOG, encoding="utf-8")
@@ -394,7 +394,7 @@ def build_server(
     port: int = MCP_PORT,
 ) -> FastMCP:
     backend = QdrantV2Backend(qdrant_url)
-    mcp = FastMCP("paperRAG-v2", host=host, port=port)
+    mcp = FastMCP("publicationRAG-v2", host=host, port=port)
 
     # ═══════════════════════════════════════════════════════════════════════
     # 1. SEMANTIC SEARCH (4 tools)
@@ -417,7 +417,7 @@ def build_server(
             query: Natural language search query.
             top_k: Number of results (default 10).
             where: JSON filter array, e.g. [{"field":"kw_alloy_system","op":"eq","value":"ni_base_superalloy"}]
-            group_by: Limit results per group (e.g. "doi" for 1 result per paper).
+            group_by: Limit results per group (e.g. "doi" for 1 result per publication).
             snippet_chars: Max characters in text snippet (default 500).
         """
         try:
@@ -516,7 +516,7 @@ def build_server(
                 rec.update({
                     "score": hit.score,
                     "figure_id": p.get("figure_id", ""),
-                    "paper_figure_number": p.get("paper_figure_number"),
+                    "publication_figure_number": p.get("publication_figure_number"),
                     "figure_type": p.get("figure_type", ""),
                     "enriched_caption": p.get("enriched_caption", ""),
                     "original_caption": p.get("original_caption", ""),
@@ -584,15 +584,15 @@ def build_server(
             return {"error": str(exc)}
 
     @mcp.tool()
-    def search_papers(
+    def search_publications(
         query: str = "",
         top_k: int = 10,
         where: WhereFilter = None,
     ) -> Dict[str, Any]:
-        """Paper-level coarse search across summaries.
+        """Publication-level coarse search across summaries.
 
-        Searches materials_v2_summaries for paper-level results. If query is empty,
-        returns papers matching the filter only (scrolls instead of vector search).
+        Searches materials_v2_summaries for publication-level results. If query is empty,
+        returns publications matching the filter only (scrolls instead of vector search).
 
         Args:
             query: Natural language search query (can be empty if using filters).
@@ -753,7 +753,7 @@ def build_server(
 
             return {
                 "count": len(deduped),
-                "unique_papers": len(unique_dois),
+                "unique_publications": len(unique_dois),
                 "dois": unique_dois,
                 "evidence": deduped,
             }
@@ -793,7 +793,7 @@ def build_server(
 
             doc_uid = chunk.payload.get("doc_uid", "")
 
-            # Find figures matching these figure_ids for this paper
+            # Find figures matching these figure_ids for this publication
             figures = []
             for fig_id in figure_ids:
                 fig_filter = qm.Filter(must=[
@@ -811,7 +811,7 @@ def build_server(
                     figures.append({
                         "point_id": str(fig_point.id),
                         "figure_id": fp.get("figure_id", ""),
-                        "paper_figure_number": fp.get("paper_figure_number"),
+                        "publication_figure_number": fp.get("publication_figure_number"),
                         "figure_type": fp.get("figure_type", ""),
                         "enriched_caption": fp.get("enriched_caption", ""),
                         "original_caption": fp.get("original_caption", ""),
@@ -900,14 +900,14 @@ def build_server(
     # ═══════════════════════════════════════════════════════════════════════
 
     @mcp.tool()
-    def find_citing_papers(doi: str, top_k: int = 20) -> Dict[str, Any]:
-        """Find papers in the corpus that cite a given DOI.
+    def find_citing_publications(doi: str, top_k: int = 20) -> Dict[str, Any]:
+        """Find publications in the corpus that cite a given DOI.
 
         Searches materials_v2_summaries where cited_dois contains the target DOI.
 
         Args:
             doi: The DOI to find citations for.
-            top_k: Maximum number of citing papers to return (default 20).
+            top_k: Maximum number of citing publications to return (default 20).
         """
         try:
             filt = qm.Filter(must=[
@@ -934,19 +934,19 @@ def build_server(
             return {
                 "cited_doi": doi,
                 "citing_count": len(records),
-                "citing_papers": records,
+                "citing_publications": records,
             }
         except Exception as exc:
             return {"error": str(exc)}
 
     @mcp.tool()
     def find_cited_by(doi: str) -> Dict[str, Any]:
-        """Get the full reference list for a paper — all DOIs it cites.
+        """Get the full reference list for a publication — all DOIs it cites.
 
-        Reads cited_dois from the paper's summary record in materials_v2_summaries.
+        Reads cited_dois from the publication's summary record in materials_v2_summaries.
 
         Args:
-            doi: DOI of the paper whose references you want.
+            doi: DOI of the publication whose references you want.
         """
         try:
             filt = qm.Filter(must=[
@@ -960,7 +960,7 @@ def build_server(
             )
 
             if not results[0]:
-                return {"error": "Paper not found: %s" % doi}
+                return {"error": "Publication not found: %s" % doi}
 
             p = results[0][0].payload
             cited_dois = p.get("cited_dois", [])
@@ -977,11 +977,11 @@ def build_server(
 
     @mcp.tool()
     def find_shared_citations(doi_a: str, doi_b: str) -> Dict[str, Any]:
-        """Find DOIs cited by both papers. Reveals common intellectual foundations.
+        """Find DOIs cited by both publications. Reveals common intellectual foundations.
 
         Args:
-            doi_a: First paper DOI.
-            doi_b: Second paper DOI.
+            doi_a: First publication DOI.
+            doi_b: Second publication DOI.
         """
         try:
             shared = []
@@ -1016,13 +1016,13 @@ def build_server(
 
     @mcp.tool()
     def resolve_citation(doi: str, ref_key: str) -> Dict[str, Any]:
-        """Given a paper DOI and citation key (e.g. "[9]"), return the resolved DOI.
+        """Given a publication DOI and citation key (e.g. "[9]"), return the resolved DOI.
 
-        Looks up citation_map in the paper's text chunks to find what DOI
+        Looks up citation_map in the publication's text chunks to find what DOI
         a reference key like "[9]" or "[23]" points to.
 
         Args:
-            doi: DOI of the paper containing the citation.
+            doi: DOI of the publication containing the citation.
             ref_key: Citation key as it appears in text, e.g. "[9]", "[23]".
         """
         try:
@@ -1047,17 +1047,17 @@ def build_server(
                 if key in citation_map:
                     resolved_doi = citation_map[key]
                     return {
-                        "paper_doi": doi,
+                        "publication_doi": doi,
                         "ref_key": key,
                         "resolved_doi": resolved_doi,
                         "found_in_section": point.payload.get("section", ""),
                     }
 
             return {
-                "paper_doi": doi,
+                "publication_doi": doi,
                 "ref_key": key,
                 "resolved_doi": None,
-                "message": "Citation key not found in any chunk for this paper.",
+                "message": "Citation key not found in any chunk for this publication.",
             }
         except Exception as exc:
             return {"error": str(exc)}
@@ -1067,11 +1067,11 @@ def build_server(
     # ═══════════════════════════════════════════════════════════════════════
 
     @mcp.tool()
-    def get_paper(doi: str) -> Dict[str, Any]:
-        """Complete paper overview: summary, metadata, keyword tags, affiliations, citation stats.
+    def get_publication(doi: str) -> Dict[str, Any]:
+        """Complete publication overview: summary, metadata, keyword tags, affiliations, citation stats.
 
         Args:
-            doi: Paper DOI.
+            doi: Publication DOI.
         """
         try:
             filt = qm.Filter(must=[
@@ -1085,7 +1085,7 @@ def build_server(
             )
 
             if not results[0]:
-                return {"error": "Paper not found: %s" % doi}
+                return {"error": "Publication not found: %s" % doi}
 
             p = results[0][0].payload
             return {
@@ -1127,15 +1127,15 @@ def build_server(
             return {"error": str(exc)}
 
     @mcp.tool()
-    def get_paper_chunks(
+    def get_publication_chunks(
         doi: str,
         chunk_type: Optional[str] = None,
         limit: int = 50,
     ) -> Dict[str, Any]:
-        """Get text chunks for a paper, optionally filtered by chunk_type.
+        """Get text chunks for a publication, optionally filtered by chunk_type.
 
         Args:
-            doi: Paper DOI.
+            doi: Publication DOI.
             chunk_type: Optional filter: abstract, introduction, methods, results, conclusion, body, table, references.
             limit: Max chunks to return (default 50).
         """
@@ -1183,11 +1183,11 @@ def build_server(
             return {"error": str(exc)}
 
     @mcp.tool()
-    def get_paper_figures(doi: str) -> Dict[str, Any]:
-        """All figures for a paper with enriched captions, figure types, and paper_figure_numbers.
+    def get_publication_figures(doi: str) -> Dict[str, Any]:
+        """All figures for a publication with enriched captions, figure types, and publication_figure_numbers.
 
         Args:
-            doi: Paper DOI.
+            doi: Publication DOI.
         """
         try:
             filt = qm.Filter(must=[
@@ -1206,7 +1206,7 @@ def build_server(
                 figures.append({
                     "point_id": str(point.id),
                     "figure_id": p.get("figure_id", ""),
-                    "paper_figure_number": p.get("paper_figure_number"),
+                    "publication_figure_number": p.get("publication_figure_number"),
                     "figure_type": p.get("figure_type", ""),
                     "enriched_caption": p.get("enriched_caption", ""),
                     "original_caption": p.get("original_caption", ""),
@@ -1229,11 +1229,11 @@ def build_server(
             return {"error": str(exc)}
 
     @mcp.tool()
-    def get_paper_tables(doi: str) -> Dict[str, Any]:
-        """All tables for a paper with CSV data, descriptions, types, and column headers.
+    def get_publication_tables(doi: str) -> Dict[str, Any]:
+        """All tables for a publication with CSV data, descriptions, types, and column headers.
 
         Args:
-            doi: Paper DOI.
+            doi: Publication DOI.
         """
         try:
             filt = qm.Filter(must=[
@@ -1285,7 +1285,7 @@ def build_server(
         alloy_system: Optional[str] = None,
         top_k: int = 10,
     ) -> Dict[str, Any]:
-        """Find papers discussing specific element combinations.
+        """Find publications discussing specific element combinations.
 
         Filters by kw_elements + optional kw_alloy_system, then performs semantic search
         with a query constructed from the element list.
@@ -1354,7 +1354,7 @@ def build_server(
         where: WhereFilter = None,
         top_k: int = 10,
     ) -> Dict[str, Any]:
-        """Find papers reporting specific property measurements.
+        """Find publications reporting specific property measurements.
 
         Combines kw_properties filter with semantic search on summaries.
 
@@ -1470,7 +1470,7 @@ def build_server(
                 rec.update({
                     "score": hit.score,
                     "figure_id": p.get("figure_id", ""),
-                    "paper_figure_number": p.get("paper_figure_number"),
+                    "publication_figure_number": p.get("publication_figure_number"),
                     "figure_type": p.get("figure_type", ""),
                     "enriched_caption": p.get("enriched_caption", ""),
                     "kw_alloy_system": p.get("kw_alloy_system", []),
@@ -1495,7 +1495,7 @@ def build_server(
     ) -> Dict[str, Any]:
         """Count distribution of any keyword/metadata field.
 
-        E.g. "top 20 alloy systems", "most common techniques in HEA papers",
+        E.g. "top 20 alloy systems", "most common techniques in HEA publications",
         "publication year distribution".
 
         Args:
@@ -1531,7 +1531,7 @@ def build_server(
     ) -> Dict[str, Any]:
         """Return controlled vocabulary for a keyword group (or all groups).
 
-        Shows valid filter values. Optionally includes corpus counts (how many papers
+        Shows valid filter values. Optionally includes corpus counts (how many publications
         actually have each value). Use this to answer questions like "what alloy systems
         are in the corpus?" or "what techniques can I filter by?".
 
@@ -1580,7 +1580,7 @@ def build_server(
 
     @mcp.tool()
     def corpus_stats() -> Dict[str, Any]:
-        """Overall corpus statistics: total papers, chunks, figures, tables.
+        """Overall corpus statistics: total publications, chunks, figures, tables.
 
         Also returns top journals and top alloy systems from the summaries collection.
         """
@@ -1637,7 +1637,7 @@ def build_server(
 
             return {
                 "collections": stats,
-                "total_papers": stats.get(COLL_SUMMARIES, 0),
+                "total_publications": stats.get(COLL_SUMMARIES, 0),
                 "total_chunks": stats.get(COLL_TEXT, 0),
                 "total_figures": stats.get(COLL_FIGURES, 0),
                 "total_tables": stats.get(COLL_TABLES, 0),
@@ -1837,7 +1837,7 @@ def _audit_wrapper(app, server_label: str):
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="paperRAG-v2 MCP server (Qdrant + Gemini embeddings)."
+        description="publicationRAG-v2 MCP server (Qdrant + Gemini embeddings)."
     )
     parser.add_argument("--qdrant-url", default=QDRANT_URL, help="Qdrant server URL.")
     parser.add_argument(
@@ -1852,7 +1852,7 @@ def main() -> None:
 
     server = build_server(qdrant_url=args.qdrant_url, host=args.host, port=args.port)
     log.info(
-        "paperRAG-v2 starting | transport=%s | qdrant=%s | prefix=%s | model=%s | auth=%s",
+        "publicationRAG-v2 starting | transport=%s | qdrant=%s | prefix=%s | model=%s | auth=%s",
         args.transport, args.qdrant_url, COLLECTION_PREFIX, EMBED_MODEL,
         ("token (%d keys)" % len(AUTH_TOKENS)) if AUTH_ENABLED else "open (IP + X-User)",
     )
@@ -1872,7 +1872,7 @@ def main() -> None:
 
     app = server.sse_app() if args.transport == "sse" else server.streamable_http_app()
     uvicorn.run(
-        _audit_wrapper(app, "paperRAG-v2"),
+        _audit_wrapper(app, "publicationRAG-v2"),
         host=args.host,
         port=args.port,
         log_level=os.getenv("LOG_LEVEL", "info").lower(),

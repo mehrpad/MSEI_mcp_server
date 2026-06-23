@@ -1,4 +1,4 @@
-# paperRAG-v2 MCP server — runtime dependencies
+# publicationRAG-v2 MCP server — runtime dependencies
 # Pinned with lower bounds; tested with the versions in comments.
 
 mcp>=1.9.0              # official Model Context Protocol SDK (FastMCP + streamable-http)

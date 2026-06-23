@@ -12,7 +12,7 @@ only in the `.env` file on the VM.
 
 When someone searches *"creep behaviour of nickel superalloys"*, the server sends
 that text to Google's embedding model, which returns a vector (a list of numbers).
-Qdrant then finds the paper passages whose vectors are closest. No key → no
+Qdrant then finds the publication passages whose vectors are closest. No key → no
 embeddings → no search.
 
 ---
@@ -113,4 +113,4 @@ curl -s -o /dev/null -w "%{http_code}\n" https://generativelanguage.googleapis.c
 
 ✅ The server now has everything it needs. Time to start it.
 
-⬅️ Back: [04 · Load the paper data](04-load-vector-data.md)  ·  ➡️ Next: [06 · Run the MCP server](06-run-mcp-server.md)
+⬅️ Back: [04 · Load the publication data](04-load-vector-data.md)  ·  ➡️ Next: [06 · Run the MCP server](06-run-mcp-server.md)

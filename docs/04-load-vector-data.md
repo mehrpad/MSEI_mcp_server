@@ -1,4 +1,4 @@
-# 04 · Load the paper data into Qdrant
+# 04 · Load the publication data into Qdrant
 
 > Goal: copy the **snapshot bundle** (produced by the separate ingest repo) onto
 > the VM and restore it into Qdrant. After this, the library is searchable.
@@ -117,7 +117,7 @@ done
 Non-zero numbers = success. The library is loaded. ✅
 
 > **Fewer than four collections?** Totally fine. With just `materials_v2` and
-> `materials_v2_summaries` you get full text + paper-summary search; the
+> `materials_v2_summaries` you get full text + publication-summary search; the
 > figure/table tools simply return nothing.
 
 ---
@@ -159,6 +159,6 @@ Save (`Ctrl+O`, `Enter`) and exit (`Ctrl+X`).
 
 ---
 
-✅ Papers are loaded. Now give the server its Google key so it can search them.
+✅ Publications are loaded. Now give the server its Google key so it can search them.
 
 ⬅️ Back: [03 · Start Qdrant](03-start-qdrant.md)  ·  ➡️ Next: [05 · Google API key](05-google-api-key.md)

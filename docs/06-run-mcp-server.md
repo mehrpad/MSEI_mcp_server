@@ -40,7 +40,7 @@ curl http://localhost:8080/health
 Expected:
 
 ```json
-{"status": "ok", "server": "paperRAG-v2", "prefix": "materials_v2"}
+{"status": "ok", "server": "publicationRAG-v2", "prefix": "materials_v2"}
 ```
 
 Watch the live logs for a few seconds (press `Ctrl+C` to stop watching — it does
@@ -53,7 +53,7 @@ docker compose logs -f mcp
 You should see a line like:
 
 ```
-paperRAG-v2 starting | transport=streamable-http | qdrant=http://qdrant:6333 | prefix=materials_v2 | model=gemini-embedding-2-preview
+publicationRAG-v2 starting | transport=streamable-http | qdrant=http://qdrant:6333 | prefix=materials_v2 | model=gemini-embedding-2-preview
 ```
 
 > **The address users will connect to** is

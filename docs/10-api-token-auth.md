@@ -71,7 +71,7 @@ In their `opencode.json`, add an `Authorization` header alongside (or instead of
 ```json
 {
   "mcp": {
-    "msei-papers": {
+    "msei-publications": {
       "type": "remote",
       "url": "http://10.12.0.5:8080/mcp",
       "enabled": true,

@@ -1,6 +1,6 @@
 # Client setup — OpenCode (give this to each user)
 
-Connects your OpenCode to the group's shared paper library and the NHR@FAU
+Connects your OpenCode to the group's shared publication library and the NHR@FAU
 models. ~5 minutes.
 
 ## 1. Prerequisites
@@ -41,8 +41,8 @@ then change:
 > error means a brace closed the file too early.
 
 ## 4. Restart OpenCode and test
-Ask: *"Call corpus_stats on msei-papers."* → paper/summary counts. Then a real
-question: *"Search the papers for fatigue crack growth in titanium alloys — give DOIs."*
+Ask: *"Call corpus_stats on msei-publications."* → publication/summary counts. Then a real
+question: *"Search the publications for fatigue crack growth in titanium alloys — give DOIs."*
 
 ## Trouble?
 - `EndOfFileExpected` / JSON error → a brace is in the wrong place (see the note in step 3).

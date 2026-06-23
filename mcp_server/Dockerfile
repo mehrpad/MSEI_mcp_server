@@ -1,4 +1,4 @@
-# paperRAG-v2 MCP server image
+# publicationRAG-v2 MCP server image
 FROM python:3.11-slim
 
 # Sensible container defaults. docker-compose overrides QDRANT_URL etc.

@@ -326,7 +326,7 @@ done
 
 You should see `materials_v2` and `materials_v2_summaries` with non-zero counts.
 **Only have those two (no figures/tables)? That's fine** — text search and
-paper-summary search work fully; the figure/table tools simply return nothing.
+publication-summary search work fully; the figure/table tools simply return nothing.
 
 Start the server (first run **builds** the image — a few minutes, through the
 proxy):
@@ -376,7 +376,7 @@ from outside, it doesn't.
 ## Phase 11 — First test with OpenCode
 
 On a **user's PC** (not the VM). OpenCode's config needs two things: a **model
-provider** (here the NHR@FAU gateway) and the **paper server** (`mcp`).
+provider** (here the NHR@FAU gateway) and the **publication server** (`mcp`).
 
 ### 11a. Set your NHR@FAU API token (PowerShell, Windows)
 
@@ -431,7 +431,7 @@ with this (also saved in
     }
   },
   "mcp": {
-    "msei-papers": {
+    "msei-publications": {
       "type": "remote",
       "url": "http://10.76.33.35:8080/mcp",
       "enabled": true,
@@ -463,11 +463,11 @@ docker compose logs -f mcp        # leave running; Ctrl+C stops watching
 
 Restart OpenCode, then ask:
 
-> *"Call corpus_stats on msei-papers."* → counts (~351k chunks, ~31k summaries).
-> *"Search the papers for rhenium's effect on creep in Ni-base superalloys; give DOIs."*
+> *"Call corpus_stats on msei-publications."* → counts (~351k chunks, ~31k summaries).
+> *"Search the publications for rhenium's effect on creep in Ni-base superalloys; give DOIs."*
 
 ✓ On the VM log you'll see the request arrive with the user's IP + `X-User`. 🎉
-**The whole system working end-to-end** — model via NHR@FAU, paper search via the
+**The whole system working end-to-end** — model via NHR@FAU, publication search via the
 MCP server, embeddings via Google through the proxy.
 
 ---
