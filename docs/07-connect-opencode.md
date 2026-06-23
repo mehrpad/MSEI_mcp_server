@@ -51,7 +51,7 @@ Change the **`url`** to your VM and **`X-User`** to your name:
 ```json
 {
   "$schema": "https://opencode.ai/config.json",
-  "model": "nhr-fau/gpt-oss-120b",
+  "model": "nhr-fau/Qwen/Qwen3.6-35B-A3B-FP8",
   "provider": {
     "nhr-fau": {
       "npm": "@ai-sdk/openai-compatible",
@@ -61,11 +61,11 @@ Change the **`url`** to your VM and **`X-User`** to your name:
         "apiKey": "{env:NHR_API_TOKEN}"
       },
       "models": {
-        "gpt-oss-120b": { "name": "gpt-oss-120b" },
-        "Kimi-K2.6": { "name": "Kimi-K2.6" },
-        "DeepSeek-V4-Flash": { "name": "DeepSeek-V4-Flash" },
-        "Mistral-Medium-3.5-128B": { "name": "Mistral-Medium-3.5-128B" },
-        "gemma-4-E4B-it": { "name": "gemma-4-E4B-it" }
+        "Qwen/Qwen3.6-35B-A3B-FP8": { "name": "Qwen3.6-35B (good for tools)" },
+        "deepseek-ai/DeepSeek-V4-Flash": { "name": "DeepSeek-V4-Flash (good for tools)" },
+        "RedHatAI/Mistral-Small-3.2-24B-Instruct-2506-FP8": { "name": "Mistral-Small-3.2-24B" },
+        "google/gemma-4-E4B-it": { "name": "gemma-4-E4B-it" },
+        "gpt-oss-120b": { "name": "gpt-oss-120b (tool-call id bug)" }
       }
     }
   },
@@ -80,7 +80,11 @@ Change the **`url`** to your VM and **`X-User`** to your name:
 }
 ```
 
-- `model` — default model written `provider-id/model-id` (`nhr-fau/gpt-oss-120b`).
+- `model` — default model written `provider-id/model-id`. **Use the EXACT IDs your
+  NHR team can access** — they're namespaced (`google/gemma-4-E4B-it`, not
+  `gemma-4-E4B-it`); a wrong one makes the gateway list the allowed IDs. **Prefer a
+  good tool-caller (Qwen3.6 / DeepSeek); avoid `gpt-oss-120b`** (malformed tool-call
+  ids → "Expected 'id' to be a string"), and never an embedding/OCR model.
 - `apiKey: "{env:NHR_API_TOKEN}"` — pulls the token you set in Step 1.
 - `mcp.msei-papers.url` — the VM address from the admin, ending in `/mcp`.
 - `headers.X-User` — how you show up in the server's audit log (honour-system

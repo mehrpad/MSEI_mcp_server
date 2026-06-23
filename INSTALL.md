@@ -396,7 +396,7 @@ with this (also saved in
 ```json
 {
   "$schema": "https://opencode.ai/config.json",
-  "model": "nhr-fau/gpt-oss-120b",
+  "model": "nhr-fau/Qwen/Qwen3.6-35B-A3B-FP8",
   "provider": {
     "nhr-fau": {
       "npm": "@ai-sdk/openai-compatible",
@@ -406,11 +406,11 @@ with this (also saved in
         "apiKey": "{env:NHR_API_TOKEN}"
       },
       "models": {
-        "gpt-oss-120b": { "name": "gpt-oss-120b" },
-        "Kimi-K2.6": { "name": "Kimi-K2.6" },
-        "DeepSeek-V4-Flash": { "name": "DeepSeek-V4-Flash" },
-        "Mistral-Medium-3.5-128B": { "name": "Mistral-Medium-3.5-128B" },
-        "gemma-4-E4B-it": { "name": "gemma-4-E4B-it" }
+        "Qwen/Qwen3.6-35B-A3B-FP8": { "name": "Qwen3.6-35B (good for tools)" },
+        "deepseek-ai/DeepSeek-V4-Flash": { "name": "DeepSeek-V4-Flash (good for tools)" },
+        "RedHatAI/Mistral-Small-3.2-24B-Instruct-2506-FP8": { "name": "Mistral-Small-3.2-24B" },
+        "google/gemma-4-E4B-it": { "name": "gemma-4-E4B-it" },
+        "gpt-oss-120b": { "name": "gpt-oss-120b (tool-call id bug)" }
       }
     }
   },
@@ -425,7 +425,13 @@ with this (also saved in
 }
 ```
 
-- `model` = the default model, written `provider-id/model-id` (`nhr-fau/gpt-oss-120b`).
+- `model` = the default model, written `provider-id/model-id`
+  (`nhr-fau/Qwen/Qwen3.6-35B-A3B-FP8`). **Use the EXACT model IDs your NHR team can
+  access** — they're namespaced (`google/gemma-4-E4B-it`, not `gemma-4-E4B-it`). If
+  you pick one your team can't use, the gateway error lists the allowed IDs.
+- **Pick a model that does tool-calling well** (Qwen3.6 / DeepSeek work; **avoid
+  `gpt-oss-120b`** — it returns malformed tool-call ids → "Expected 'id' to be a
+  string"). Don't pick embedding/OCR models (`*e5-large*`, `*vdr*`, `*OCR*`).
 - `apiKey: "{env:NHR_API_TOKEN}"` pulls the token from the env var set in 11a.
 - Change `"X-User": "mehrpad"` to each person's name (how they show up in the log).
 - **One outer `{ }`** — `model`, `provider`, `mcp` are siblings (commas between, no
