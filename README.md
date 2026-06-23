@@ -42,7 +42,7 @@ processing happens here.
 
 ```bash
 # on the VM
-git clone <this-repo-url> MSEI_mcp_server && cd MSEI_mcp_server
+git clone https://github.com/mehrpad/MSEI_mcp_server.git && cd MSEI_mcp_server
 cp .env.example .env && nano .env          # set GEMINI_API_KEY
 
 docker compose up -d qdrant                # 1) start the database

@@ -16,11 +16,16 @@ of these.
 
 ```bash
 cd ~
-git clone <the-repo-url> MSEI_mcp_server
+git clone https://github.com/mehrpad/MSEI_mcp_server.git
 cd MSEI_mcp_server
 ```
 
 (No `git`? `sudo apt update && sudo apt install -y git`, then retry.)
+
+> **The repo is private.** The clone will ask for a GitHub username + a
+> **Personal Access Token** (not your password) — create one at
+> <https://github.com/settings/tokens>. If that's a hassle, just use **Option B**
+> below (`scp`), which needs no GitHub access at all.
 
 ### Option B — copy it from your computer
 
