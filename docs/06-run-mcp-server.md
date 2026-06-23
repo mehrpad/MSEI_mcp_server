@@ -76,42 +76,50 @@ popular `ufw` firewall **does not** filter Docker-published ports the way you'd
 expect. The reliable way to restrict a Docker-published port is the special
 **`DOCKER-USER`** rule below.
 
-### Allow only your subnet to reach port 8080
+### Allow only your users' subnet to reach port 8080
 
-Replace `10.12.0.0/16` with **your group's subnet** (ask if unsure):
+The subnet you allow is **where the OpenCode users' PCs are** — which is usually
+**not the VM's own subnet**. (Real example: the VM is on `10.76.33.x`, but the
+users' PCs are on `10.131.233.x`, so you allow `10.131.233.0/24`.) Find a user
+PC's subnet from its IP + mask (a `255.255.255.0` mask = `/24`).
+
+Do it in this order — **allow first, drop last** — so you never cut off the
+allowed subnet, and the `RETURN` ends up **above** the `DROP`:
 
 ```bash
-# Allow your subnet, drop everyone else, for the MCP port.
-sudo iptables -I DOCKER-USER -p tcp --dport 8080 -s 10.12.0.0/16 -j RETURN
-sudo iptables -I DOCKER-USER -p tcp --dport 8080 -j DROP
+# 1) Allow your users' subnet (nothing is blocked yet — safe). Repeat for each
+#    subnet your users are on. Replace 10.131.233.0/24 with YOUR real subnet:
+sudo iptables -I DOCKER-USER -p tcp --dport 8080 -s 10.131.233.0/24 -j RETURN
+
+# 2) THEN drop everyone else (added AFTER the allow):
+sudo iptables -A DOCKER-USER -p tcp --dport 8080 -j DROP
+
+# 3) Confirm the order — the RETURN line(s) must be ABOVE the DROP:
+sudo iptables -S DOCKER-USER
 ```
 
-> Order matters: the `RETURN` (allow) rule is inserted first so it sits **above**
-> the `DROP`. `-I` inserts at the top, so run them in the order shown.
+> ⚠️ **Replace the subnet, and add the `DROP` last.** If you add a `DROP` with no
+> matching `RETURN` above it (left a placeholder, or wrong order), you block
+> **everyone** — the symptom is nobody can open `http://<vm>:8080/health`, not
+> even allowed PCs.
+>
+> **Locked yourself out?** Add the allow rule for your subnet — it goes above the
+> DROP and restores access instantly:
+> `sudo iptables -I DOCKER-USER -p tcp --dport 8080 -s 10.131.233.0/24 -j RETURN`
 
-Make the rules survive a reboot:
+Make the rules survive a reboot, and protect SSH:
 
 ```bash
 sudo apt install -y iptables-persistent
 sudo netfilter-persistent save
-```
-
-Also protect SSH and general traffic with `ufw` (this part `ufw` handles fine):
-
-```bash
-sudo ufw allow OpenSSH
-sudo ufw --force enable
+sudo ufw allow OpenSSH && sudo ufw --force enable
 ```
 
 ### Verify the lockdown
 
-From a computer **on your subnet**, this should connect:
-
-```bash
-curl http://10.12.0.5:8080/health
-```
-
-From a machine **outside** the subnet, the same command should hang/refuse.
+From a PC **on an allowed subnet**, open `http://<VM_IP>:8080/health` in a browser
+(or `curl` it) — it should return the `ok` JSON. From a machine **outside** the
+allowed subnet(s), the same request should hang/refuse.
 
 ---
 

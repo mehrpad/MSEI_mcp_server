@@ -339,21 +339,37 @@ curl http://localhost:8080/health        # → {"status":"ok", ... "prefix":"mat
 
 ---
 
-## Phase 10 — Lock the server to your subnet
+## Phase 10 — Lock the server to your users' subnet
 
-Docker bypasses `ufw` for published ports, so use the `DOCKER-USER` chain
-(order matters — run as shown). Replace `SUBNET`:
+Restrict `:8080` to the subnet where your **OpenCode users' PCs** are — note that
+is usually **NOT the VM's own subnet**. (Here the VM is `10.76.33.x` but users are
+`10.131.233.x`, so we allow `10.131.233.0/24`.)
+
+Docker bypasses `ufw` for published ports, so use the `DOCKER-USER` chain.
+**Allow first, drop last** — that keeps the allowed subnet reachable the whole
+time and puts `RETURN` above `DROP`:
 
 ```bash
-iptables -I DOCKER-USER -p tcp --dport 8080 -s SUBNET -j RETURN
-iptables -I DOCKER-USER -p tcp --dport 8080 -j DROP
-apt-get install -y iptables-persistent
-netfilter-persistent save
+# 1) allow your users' subnet (replace with YOUR real subnet; repeat per subnet):
+iptables -I DOCKER-USER -p tcp --dport 8080 -s 10.131.233.0/24 -j RETURN
+
+# 2) THEN drop everyone else:
+iptables -A DOCKER-USER -p tcp --dport 8080 -j DROP
+
+# 3) confirm RETURN is ABOVE DROP:
+iptables -S DOCKER-USER
+
+# 4) persist + protect SSH:
+apt-get install -y iptables-persistent && netfilter-persistent save
 ufw allow OpenSSH && ufw --force enable
 ```
 
-✓ From a PC **on your subnet**, `curl http://VM_IP:8080/health` works; from
-outside, it doesn't.
+> ⚠️ **Replace the subnet and add the `DROP` last.** A `DROP` with no `RETURN`
+> above it blocks **everyone** (symptom: nobody can open `:8080/health`).
+> **Locked out?** Run step 1 with your subnet — it restores access instantly.
+
+✓ From a PC on an allowed subnet, `http://VM_IP:8080/health` works in a browser;
+from outside, it doesn't.
 
 ---
 
