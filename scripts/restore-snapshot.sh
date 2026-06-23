@@ -4,9 +4,11 @@
 # Usage:
 #   bash scripts/restore-snapshot.sh <dir-with-.snapshot-files> [QDRANT_URL]
 #
-# Each file should be named "<collection>__<snapshotname>.snapshot" (the naming
-# the ingest repo's snapshot bundler produces). The collection name is taken from
-# the part before "__"; the collection is created automatically on upload.
+# Works out the target collection from each filename, in two supported formats:
+#   * Qdrant native:  <collection>-<id>-<YYYY-MM-DD-HH-MM-SS>.snapshot
+#                     e.g. materials_v2-2819031290988516-2026-05-27-12-40-06.snapshot
+#   * bundler:        <collection>__<snapshotname>.snapshot
+# The collection is created automatically on upload.
 set -euo pipefail
 
 DIR="${1:-}"
@@ -27,10 +29,17 @@ fi
 echo "Restoring ${#files[@]} snapshot(s) into ${QDRANT_URL}"
 for f in "${files[@]}"; do
   base="$(basename "$f")"
-  coll="${base%%__*}"
-  if [[ "$coll" == "$base" ]]; then
-    echo "!! Skipping '$base' — name has no '__', so the target collection is unknown." >&2
-    echo "   Restore it by hand with the collection name you want." >&2
+  if [[ "$base" == *"__"* ]]; then
+    # bundler format: <collection>__<snapshotname>.snapshot
+    coll="${base%%__*}"
+  else
+    # Qdrant native format: <collection>-<id>-<YYYY-MM-DD-HH-MM-SS>.snapshot
+    coll="$(printf '%s' "$base" | sed -E 's/-[0-9]+-[0-9]{4}-[0-9]{2}-[0-9]{2}-[0-9]{2}-[0-9]{2}-[0-9]{2}\.snapshot$//')"
+  fi
+  if [[ -z "$coll" || "$coll" == "$base" ]]; then
+    echo "!! Could not determine the collection name from '$base'." >&2
+    echo "   Restore it by hand with the target name, e.g.:" >&2
+    echo "   curl -X POST ${QDRANT_URL%/}/collections/<NAME>/snapshots/upload -F snapshot=@'$f'" >&2
     continue
   fi
   echo "==> ${coll}  (from ${base})"

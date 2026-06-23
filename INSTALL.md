@@ -240,36 +240,66 @@ curl http://localhost:6333/collections   # → empty list (correct, no data yet)
 
 ## Phase 8 — Transfer the vector database to the VM
 
-Copy the `BUNDLE` from your PC (**run on your PC**):
+Snapshots come either as **loose `.snapshot` files** (Qdrant's native names look
+like `materials_v2-<id>-<date>.snapshot`) or as one `.tar.gz` **bundle**. Make a
+folder on the VM, then copy them in with `scp`.
 
-```powershell
-scp "C:\path\to\BUNDLE" VM_USER@VM_IP:~/
-```
-
-Unpack it on the **VM**:
+On the **VM**:
 
 ```bash
-cd ~ && mkdir -p snapshots
-tar -xzf BUNDLE -C snapshots
-ls -lh snapshots          # → four .snapshot files + RESTORE.md
+mkdir -p ~/snapshots
+```
+
+On your **PC** — loose files (use YOUR real filenames):
+
+```powershell
+scp "C:\path\to\materials_v2-2819031290988516-2026-05-27-12-40-06.snapshot"           VM_USER@VM_IP:~/snapshots/
+scp "C:\path\to\materials_v2_summaries-2819031290988516-2026-05-27-12-41-41.snapshot" VM_USER@VM_IP:~/snapshots/
+```
+
+…or a bundle: `scp "C:\path\to\BUNDLE.tar.gz" VM_USER@VM_IP:~/` then on the VM
+`tar -xzf ~/BUNDLE.tar.gz -C ~/snapshots`.
+
+On the **VM**, confirm they arrived:
+
+```bash
+ls -lh ~/snapshots
 ```
 
 ---
 
 ## Phase 9 — Restore the data + start the MCP server
 
+The restore script reads the **collection name out of each filename
+automatically** (it understands the `materials_v2-<id>-<date>.snapshot` format):
+
 ```bash
 cd ~/MSEI_mcp_server
 bash scripts/restore-snapshot.sh ~/snapshots
 ```
 
-✓ Confirm data loaded (non-zero counts):
+<details><summary>Or restore each file explicitly (you name the collection yourself — foolproof)</summary>
 
 ```bash
-for c in materials_v2 materials_v2_figures materials_v2_tables materials_v2_summaries; do
-  printf "%-28s " "$c"; curl -s "http://localhost:6333/collections/$c" | jq '.result.points_count'
+Q=http://localhost:6333
+curl -sS -X POST "$Q/collections/materials_v2/snapshots/upload?priority=snapshot" \
+  -F "snapshot=@$HOME/snapshots/materials_v2-2819031290988516-2026-05-27-12-40-06.snapshot"; echo
+curl -sS -X POST "$Q/collections/materials_v2_summaries/snapshots/upload?priority=snapshot" \
+  -F "snapshot=@$HOME/snapshots/materials_v2_summaries-2819031290988516-2026-05-27-12-41-41.snapshot"; echo
+```
+</details>
+
+✓ Confirm what loaded — lists whatever collections exist, with point counts:
+
+```bash
+for c in $(curl -s http://localhost:6333/collections | jq -r '.result.collections[].name'); do
+  printf "%-30s " "$c"; curl -s "http://localhost:6333/collections/$c" | jq '.result.points_count'
 done
 ```
+
+You should see `materials_v2` and `materials_v2_summaries` with non-zero counts.
+**Only have those two (no figures/tables)? That's fine** — text search and
+paper-summary search work fully; the figure/table tools simply return nothing.
 
 Start the server (first run **builds** the image — a few minutes, through the
 proxy):

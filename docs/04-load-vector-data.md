@@ -9,48 +9,55 @@ This is the "copy Qdrant to the VM" step.
 
 ## What you're loading
 
-The ingest repo produces a single bundle file, e.g.:
+You get one `.snapshot` file **per collection**. A full corpus has up to four
+(`materials_v2` text, `_figures`, `_tables`, `_summaries`), but you may have fewer
+— e.g. just text + summaries. That's fine; the server uses whatever is present.
+
+Filenames come in one of two shapes — both are handled automatically:
 
 ```
-colleague_materials_v2_qdrant_20260601.tar.gz
+# Qdrant native (most common):  <collection>-<id>-<date>.snapshot
+materials_v2-2819031290988516-2026-05-27-12-40-06.snapshot            ← collection: materials_v2
+materials_v2_summaries-2819031290988516-2026-05-27-12-41-41.snapshot  ← collection: materials_v2_summaries
+
+# bundler (.tar.gz from the ingest repo):  <collection>__<name>.snapshot
+materials_v2__<...>.snapshot                                          ← collection: materials_v2
 ```
 
-Inside it are **four snapshot files** (one per collection) plus a `RESTORE.md`:
-
-```
-materials_v2__<...>.snapshot            ← text chunks
-materials_v2_figures__<...>.snapshot    ← figures
-materials_v2_tables__<...>.snapshot     ← tables
-materials_v2_summaries__<...>.snapshot  ← paper summaries
-```
-
-The part of each filename **before `__`** is the collection it restores into.
+In both, the **collection name is the leading part** of the filename — that's the
+collection each file restores into. The restore script figures this out for you.
 
 ---
 
-## Step 1 — Copy the bundle to the VM
+## Step 1 — Copy the snapshots to the VM
 
-On **your own computer** (where the bundle is), copy it up. See
-[01 · Transfer a file](01-linux-basics.md#6-transfer-a-file-to-the-vm-youll-need-this-in-step-04):
-
-```bash
-scp "C:\path\to\colleague_materials_v2_qdrant_20260601.tar.gz" msei@10.12.0.5:~/
-```
-
----
-
-## Step 2 — Unpack it on the VM
-
-Back on the **VM**:
+Make a folder on the **VM**:
 
 ```bash
-cd ~
-mkdir -p snapshots
-tar -xzf colleague_materials_v2_qdrant_20260601.tar.gz -C snapshots
-ls -lh snapshots
+mkdir -p ~/snapshots
 ```
 
-You should see the four `.snapshot` files and `RESTORE.md`.
+Then copy from **your computer**. For **loose `.snapshot` files** (use your real
+filenames):
+
+```bash
+scp "C:\path\to\materials_v2-2819031290988516-2026-05-27-12-40-06.snapshot"           msei@10.12.0.5:~/snapshots/
+scp "C:\path\to\materials_v2_summaries-2819031290988516-2026-05-27-12-41-41.snapshot" msei@10.12.0.5:~/snapshots/
+```
+
+Or for a **`.tar.gz` bundle** — copy it, then unpack on the VM:
+
+```bash
+scp "C:\path\to\bundle.tar.gz" msei@10.12.0.5:~/
+# then, on the VM:
+tar -xzf ~/bundle.tar.gz -C ~/snapshots
+```
+
+Confirm on the **VM**:
+
+```bash
+ls -lh ~/snapshots
+```
 
 ---
 
@@ -70,16 +77,19 @@ take a while for a large corpus — let it finish.
 <details>
 <summary>What the script runs under the hood (if you prefer to do it by hand)</summary>
 
-For each file it calls Qdrant's snapshot-upload API:
+For each file it calls Qdrant's snapshot-upload API, naming the target collection
+in the URL:
 
 ```bash
 curl -sS -X POST \
   "http://localhost:6333/collections/materials_v2/snapshots/upload?priority=snapshot" \
   -H 'Content-Type: multipart/form-data' \
-  -F "snapshot=@/home/msei/snapshots/materials_v2__SNAPSHOTNAME.snapshot"
+  -F "snapshot=@$HOME/snapshots/materials_v2-2819031290988516-2026-05-27-12-40-06.snapshot"
 ```
 
-The collection name (`materials_v2`) is taken from the filename before `__`.
+The collection name (`materials_v2`) is the leading part of the filename. Doing it
+by hand like this is the foolproof fallback if a filename is unusual — just put
+the right collection name in the URL.
 </details>
 
 ---
@@ -90,17 +100,21 @@ The collection name (`materials_v2`) is taken from the filename before `__`.
 curl -s http://localhost:6333/collections | jq
 ```
 
-You should now see your four collections listed. Check the point counts (how many
-items are in each):
+You'll see the collections you restored. Check the point counts — this loop lists
+**whatever exists**, so it works whether you have two collections or four:
 
 ```bash
-for c in materials_v2 materials_v2_figures materials_v2_tables materials_v2_summaries; do
-  printf "%-28s " "$c"
+for c in $(curl -s http://localhost:6333/collections | jq -r '.result.collections[].name'); do
+  printf "%-30s " "$c"
   curl -s "http://localhost:6333/collections/$c" | jq '.result.points_count'
 done
 ```
 
 Non-zero numbers = success. The library is loaded. ✅
+
+> **Fewer than four collections?** Totally fine. With just `materials_v2` and
+> `materials_v2_summaries` you get full text + paper-summary search; the
+> figure/table tools simply return nothing.
 
 ---
 
