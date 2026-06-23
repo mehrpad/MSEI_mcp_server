@@ -1,0 +1,9 @@
+# paperRAG-v2 MCP server — runtime dependencies
+# Pinned with lower bounds; tested with the versions in comments.
+
+mcp>=1.9.0              # official Model Context Protocol SDK (FastMCP + streamable-http)
+qdrant-client>=1.8.0   # talks to the Qdrant vector database
+google-genai>=1.0      # Google Gemini embedding API client
+uvicorn>=0.30          # ASGI server for the HTTP transports
+python-dotenv>=1.0     # loads .env when running outside Docker
+pydantic>=2.0          # used by the MCP SDK and our config

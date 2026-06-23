@@ -1,0 +1,82 @@
+# MSEI paper-RAG stack: Qdrant (vector DB) + the MCP server for OpenCode.
+#
+#   Start:   docker compose up -d
+#   Logs:    docker compose logs -f mcp
+#   Stop:    docker compose down            (data is kept in named volumes)
+#
+# See docs/ for the full, beginner-friendly walkthrough.
+
+name: msei-paperrag
+
+services:
+  # ── Vector database ─────────────────────────────────────────────────────
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: msei-qdrant
+    restart: unless-stopped
+    volumes:
+      - qdrant_storage:/qdrant/storage
+    ports:
+      # Loopback ONLY. The admin can restore snapshots / inspect Qdrant from
+      # the VM itself (curl http://localhost:6333), but nobody on the LAN can
+      # reach the raw database. The MCP server reaches Qdrant over the private
+      # compose network at http://qdrant:6333 instead.
+      - "127.0.0.1:6333:6333"
+    networks: [internal]
+
+  # ── MCP server (what OpenCode connects to) ──────────────────────────────
+  mcp:
+    build: ./mcp_server
+    image: msei/paperrag-mcp:latest
+    container_name: msei-mcp
+    restart: unless-stopped
+    depends_on: [qdrant]
+    env_file: [.env]            # GEMINI_API_KEY, COLLECTION_PREFIX, EMBED_MODEL, ...
+    environment:
+      # Fixed infrastructure wiring (do not put these in .env).
+      QDRANT_URL: http://qdrant:6333
+      MCP_HOST: 0.0.0.0
+      MCP_PORT: "8080"
+      MCP_TRANSPORT: streamable-http
+    volumes:
+      - mcp_data:/data          # used only if you enable AUDIT_LOG=/data/audit.log
+    ports:
+      # Published to the LAN so the ~100 OpenCode clients can connect.
+      # Restrict who can actually reach it with the host firewall
+      # (see docs/06-run-mcp-server.md). Change the left number via HOST_PORT.
+      - "${HOST_PORT:-8080}:8080"
+    networks: [internal]
+
+  # ── Optional: a 2nd MCP server for a SECOND corpus ──────────────────────
+  # Off by default (compose profile). Start it with:
+  #     docker compose --profile second up -d
+  # It serves COLLECTION_PREFIX_2 on HOST_PORT_2, from the same Qdrant.
+  # See docs/08-update-add-database.md (Scenario B).
+  mcp-secondary:
+    build: ./mcp_server
+    image: msei/paperrag-mcp:latest
+    container_name: msei-mcp-2
+    restart: unless-stopped
+    depends_on: [qdrant]
+    profiles: ["second"]
+    env_file: [.env]
+    environment:
+      QDRANT_URL: http://qdrant:6333
+      MCP_HOST: 0.0.0.0
+      MCP_PORT: "8080"
+      MCP_TRANSPORT: streamable-http
+      # Override the prefix from .env so this container serves the 2nd corpus.
+      COLLECTION_PREFIX: ${COLLECTION_PREFIX_2:-materials_v2_external}
+    volumes:
+      - mcp_data:/data
+    ports:
+      - "${HOST_PORT_2:-8081}:8080"
+    networks: [internal]
+
+volumes:
+  qdrant_storage:               # the actual vector data — back this up
+  mcp_data:
+
+networks:
+  internal:
+    driver: bridge

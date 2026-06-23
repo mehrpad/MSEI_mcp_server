@@ -1,0 +1,13 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "msei-papers": {
+      "type": "remote",
+      "url": "http://10.12.0.5:8080/mcp",
+      "enabled": true,
+      "headers": {
+        "X-User": "your.name"
+      }
+    }
+  }
+}

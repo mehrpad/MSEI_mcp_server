@@ -1,0 +1,23 @@
+# Secrets / local config
+.env
+
+# Runtime data
+data/
+*.log
+
+# Qdrant snapshots (large binaries — transfer out-of-band, don't commit)
+*.snapshot
+*.tar.gz
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
