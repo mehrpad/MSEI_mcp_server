@@ -139,6 +139,38 @@ search, image similarity, and more.)
 
 ---
 
+## Also works in Claude Code (optional)
+
+Claude Code (CLI, desktop app, IDE extensions) speaks MCP too. Add the same
+server once, in a terminal:
+
+```bash
+claude mcp add --transport http --scope user msei-publications http://10.76.33.35:8080/mcp --header "X-User: your.name"
+```
+
+- `--scope user` = available in all your Claude Code projects.
+- Verify with `claude mcp list`, or `/mcp` inside a session (shows the tool count).
+- **Restart Claude Code** to pick up a newly added server.
+
+Prefer editing config? Add this to `~/.claude.json` (user-global) or a project
+`.mcp.json` (`type` may be `http` or `streamable-http`):
+
+```json
+{ "mcpServers": { "msei-publications": {
+  "type": "http", "url": "http://10.76.33.35:8080/mcp",
+  "headers": { "X-User": "your.name" } } } }
+```
+
+Then ask: *"Use msei-publications: call corpus_stats, then search_publications for …"*
+
+## Access from home / off the office LAN
+
+Not on the office network? See
+[12 · Remote access (VPN / SSH tunnel)](12-remote-access.md) — connect over the
+FAU VPN, or tunnel via SSH and point the client at `http://127.0.0.1:8080/mcp`.
+
+---
+
 ## The short version to give the group
 
 > 1. Install OpenCode.

@@ -339,37 +339,54 @@ curl http://localhost:8080/health        # → {"status":"ok", ... "prefix":"mat
 
 ---
 
-## Phase 10 — Lock the server to your users' subnet
+## Phase 10 — Network access (open vs. restricted)
 
-Restrict `:8080` to the subnet where your **OpenCode users' PCs** are — note that
-is usually **NOT the VM's own subnet**. (Here the VM is `10.76.33.x` but users are
-`10.131.233.x`, so we allow `10.131.233.0/24`.)
+Pick one, based on how your university network already gates the VM.
 
-Docker bypasses `ufw` for published ports, so use the `DOCKER-USER` chain.
-**Allow first, drop last** — that keeps the allowed subnet reachable the whole
-time and puts `RETURN` above `DROP`:
+### Option A — Open mode (simplest; recommended if the VM is already isolated)
+
+If the university's network only routes the VM to your institute's networks
+(MSEI / internal), it's already gated at the network layer — so you can leave
+`:8080` open to anything that can reach it. This is simplest and lets VPN,
+other-subnet, and home users connect with **no per-IP rules**. The port is
+already published to all interfaces; just make sure no leftover restriction is in
+place:
 
 ```bash
-# 1) allow your users' subnet (replace with YOUR real subnet; repeat per subnet):
-iptables -I DOCKER-USER -p tcp --dport 8080 -s 10.131.233.0/24 -j RETURN
+# remove any DOCKER-USER restriction you added earlier (ignore "Bad rule" errors):
+iptables -D DOCKER-USER -p tcp --dport 8080 -j DROP 2>/dev/null
+iptables -D DOCKER-USER -p tcp --dport 8080 -s 10.131.233.0/24 -j RETURN 2>/dev/null
+iptables -S DOCKER-USER          # no :8080 rules = open
+netfilter-persistent save
+ufw allow OpenSSH && ufw --force enable     # still protect SSH
+```
 
-# 2) THEN drop everyone else:
-iptables -A DOCKER-USER -p tcp --dport 8080 -j DROP
+> Access is then gated **only** by the university network. Identity is still IP +
+> the self-declared `X-User` header (no password). For real per-user control, turn
+> on token auth ([docs/10](docs/10-api-token-auth.md)) — that's the access "flag",
+> and it works regardless of IP.
 
-# 3) confirm RETURN is ABOVE DROP:
-iptables -S DOCKER-USER
+### Option B — Restrict to specific subnet(s)
 
-# 4) persist + protect SSH:
+Allow only the subnet(s) where your users' PCs are (usually **not** the VM's own
+subnet). `DOCKER-USER` bypasses `ufw`, so use it directly — **allow first, drop
+last** so the allowed subnet is never cut off:
+
+```bash
+iptables -I DOCKER-USER -p tcp --dport 8080 -s 10.131.233.0/24 -j RETURN  # allow (repeat per subnet)
+iptables -A DOCKER-USER -p tcp --dport 8080 -j DROP                        # then drop the rest
+iptables -S DOCKER-USER                                                    # RETURN must be ABOVE DROP
 apt-get install -y iptables-persistent && netfilter-persistent save
 ufw allow OpenSSH && ufw --force enable
 ```
 
-> ⚠️ **Replace the subnet and add the `DROP` last.** A `DROP` with no `RETURN`
-> above it blocks **everyone** (symptom: nobody can open `:8080/health`).
-> **Locked out?** Run step 1 with your subnet — it restores access instantly.
+> ⚠️ A `DROP` with no `RETURN` above it blocks **everyone**. Locked out? Re-run
+> the allow line with your subnet — it restores access instantly.
 
-✓ From a PC on an allowed subnet, `http://VM_IP:8080/health` works in a browser;
-from outside, it doesn't.
+✓ Verify from a user PC: open `http://<VM_IP>:8080/health` in a browser.
+
+**Working from home / off the office LAN?** See
+[docs/12 — remote access (VPN / SSH tunnel)](docs/12-remote-access.md).
 
 ---
 
@@ -487,7 +504,8 @@ MCP server, embeddings via Google through the proxy.
 **Next:** update/swap a corpus → [docs/08](docs/08-update-add-database.md) ·
 backups & troubleshooting → [docs/09](docs/09-operations-troubleshooting.md) ·
 per-user tokens → [docs/10](docs/10-api-token-auth.md) ·
-proxy details → [docs/11](docs/11-proxy-setup.md).
+proxy details → [docs/11](docs/11-proxy-setup.md) ·
+remote access (VPN / SSH tunnel) → [docs/12](docs/12-remote-access.md).
 
 ---
 

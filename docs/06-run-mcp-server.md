@@ -76,7 +76,25 @@ popular `ufw` firewall **does not** filter Docker-published ports the way you'd
 expect. The reliable way to restrict a Docker-published port is the special
 **`DOCKER-USER`** rule below.
 
-### Allow only your users' subnet to reach port 8080
+### Option A — Open mode (rely on the university network)
+
+If the university already routes the VM **only** to your institute's networks,
+it's gated at the network layer — so you can leave `:8080` open to anything that
+can reach it. This is simplest, and VPN / other-subnet / home users connect with
+no per-IP rules. Just remove any restriction you added earlier:
+
+```bash
+sudo iptables -D DOCKER-USER -p tcp --dport 8080 -j DROP 2>/dev/null
+sudo iptables -D DOCKER-USER -p tcp --dport 8080 -s 10.131.233.0/24 -j RETURN 2>/dev/null
+sudo iptables -S DOCKER-USER       # no :8080 rules = open
+sudo netfilter-persistent save
+```
+
+> Access is then gated **only** by the university network; identity stays IP +
+> the self-declared `X-User` header. For real per-user control (regardless of IP),
+> enable token auth ([step 10](10-api-token-auth.md)) — that's the access "flag".
+
+### Option B — Restrict to your users' subnet(s)
 
 The subnet you allow is **where the OpenCode users' PCs are** — which is usually
 **not the VM's own subnet**. (Real example: the VM is on `10.76.33.x`, but the

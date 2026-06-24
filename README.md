@@ -101,13 +101,14 @@ MSEI_mcp_server/
 ├── client-config/
 │   ├── opencode.example.json  ← what each user pastes into OpenCode
 │   └── README.md              ← the user-facing short guide
-└── docs/                      ← 00–11, the step-by-step setup guide
+└── docs/                      ← 00–12, the step-by-step setup guide
     ├── 00-overview.md            01-linux-basics.md       02-install-docker.md
     ├── 03-start-qdrant.md        04-load-vector-data.md   05-google-api-key.md
     ├── 06-run-mcp-server.md      07-connect-opencode.md   08-update-add-database.md
     ├── 09-operations-troubleshooting.md
     ├── 10-api-token-auth.md      (optional: per-user tokens)
-    └── 11-proxy-setup.md         (FAU/RRZE: VM behind a proxy)
+    ├── 11-proxy-setup.md         (FAU/RRZE: VM behind a proxy)
+    └── 12-remote-access.md       (from home: VPN / SSH tunnel)
 ```
 
 ---
