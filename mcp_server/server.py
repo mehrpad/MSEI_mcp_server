@@ -425,7 +425,9 @@ def build_server(
             filt = _build_qdrant_filter(where)
 
             if group_by:
-                results = backend.qdrant.query_points(
+                # Grouping uses a dedicated method in qdrant-client; passing
+                # group_by/group_size to query_points() raises "Unknown arguments".
+                results = backend.qdrant.query_points_groups(
                     collection_name=COLL_TEXT,
                     query=vector,
                     using="gemini",
