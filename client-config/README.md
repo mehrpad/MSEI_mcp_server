@@ -3,10 +3,29 @@
 Connects your OpenCode to the group's shared publication library and the NHR@FAU
 models. ~5 minutes.
 
-## 1. Prerequisites
-- OpenCode installed — <https://opencode.ai>
-- Your **NHR@FAU API token** (from the NHR portal)
-- From the admin: the server URL (e.g. `http://10.76.33.35:8080/mcp`)
+## 1. Install OpenCode (it's a terminal app)
+
+OpenCode runs in a **terminal** — there is no separate "software" vs "terminal"
+version. You install it once with a command, then start it by typing `opencode`.
+Configuring it (the token + `opencode.json`) is identical however you launch it.
+
+**Install — pick one** (Windows users: `npm` is easiest if you have Node.js):
+
+```powershell
+npm install -g opencode-ai          # anywhere Node.js is installed
+scoop install opencode              # or, Windows: Scoop
+choco install opencode              # or, Windows: Chocolatey
+curl -fsSL https://opencode.ai/install | bash   # macOS / Linux / WSL
+```
+
+- **Check it:** `opencode --version`
+- **Start it:** open a terminal in the folder you want to work in, type `opencode`
+- Inside OpenCode, `/mcp` lists connected servers (you'll see `msei-publications`
+  after step 3).
+
+**You also need:**
+- Your **NHR@FAU API token** (from the NHR portal).
+- From the admin: the server URL (e.g. `http://10.76.33.35:8080/mcp`).
 
 ## 2. Set your NHR API token (PowerShell on Windows)
 
