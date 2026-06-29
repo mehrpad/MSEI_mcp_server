@@ -44,16 +44,35 @@ setx NHR_API_TOKEN "PASTE_YOUR_TOKEN_HERE"    # make permanent (new terminals)
 > **regenerate it in the NHR portal**.
 > macOS/Linux: `export NHR_API_TOKEN="..."` in `~/.bashrc` / `~/.zshrc`.
 
-## 3. Edit your OpenCode config
+## 3. Edit your OpenCode config (connect to the VM)
 
-Open (create if missing):
-- Windows: `%USERPROFILE%\.config\opencode\opencode.json`
-- macOS/Linux: `~/.config/opencode/opencode.json`
+Open the config — by hand, or from the terminal (it creates the file if missing):
+
+```powershell
+# Windows (PowerShell):
+mkdir $env:USERPROFILE\.config\opencode      # ignore error if it exists
+notepad $env:USERPROFILE\.config\opencode\opencode.json
+```
+```bash
+# macOS / Linux (Terminal):
+mkdir -p ~/.config/opencode
+open -e ~/.config/opencode/opencode.json     # or: nano ~/.config/opencode/opencode.json
+```
 
 Replace its **whole contents** with [`opencode.example.json`](opencode.example.json),
-then change:
-- `url` → the address your admin gave you (must end in `/mcp`)
-- `X-User` → your name/initials (how you appear in the server log)
+then set the **connection details**:
+- `url` → `http://<VM-IP>:8080/mcp` — the address from your admin (here
+  `http://10.76.33.35:8080/mcp`); must be `http` (not https) and end in `/mcp`.
+- `headers.X-User` → your name/initials (how you appear in the server log).
+- (`"type": "remote"` stays — it's a network server.)
+
+> Already have an `opencode.json`? Add **just** the `mcp` block (a sibling of
+> `provider`) instead of creating a second file:
+> ```json
+> "mcp": { "msei-publications": { "type": "remote",
+>   "url": "http://10.76.33.35:8080/mcp", "enabled": true,
+>   "headers": { "X-User": "your.name" } } }
+> ```
 
 > It must be **one** object: `{` at the top, `}` at the bottom, with `model`,
 > `provider`, and `mcp` as siblings (commas between them). An `EndOfFileExpected`
