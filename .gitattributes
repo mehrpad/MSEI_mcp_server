@@ -12,6 +12,16 @@
 *.md        text eol=lf
 Dockerfile  text eol=lf
 
-# Binary artifacts — never normalize.
+# Binary artifacts — never normalize (the `* text=auto eol=lf` above must not
+# touch these, or the file gets corrupted on some git configs/platforms).
 *.snapshot  binary
 *.tar.gz    binary
+*.docx      binary
+*.xlsx      binary
+*.pptx      binary
+*.pdf       binary
+*.png       binary
+*.jpg       binary
+*.jpeg      binary
+*.gif       binary
+*.zip       binary
