@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import os
 import re
+import time
 import traceback
 from dataclasses import dataclass
 from datetime import datetime
@@ -422,19 +423,30 @@ class CrossrefOpenAlexBackend:
         timeout: int,
         params: Optional[Dict[str, Any]] = None,
     ) -> Optional[Dict[str, Any]]:
-        try:
-            resp = requests.get(url, params=params, timeout=timeout, headers=self._headers())
+        # Retry transient failures (esp. OpenAlex's intermittent 503 on /works
+        # search) with a short exponential backoff before giving up.
+        RETRYABLE = {429, 500, 502, 503, 504}
+        attempts = 3
+        for attempt in range(attempts):
+            try:
+                resp = requests.get(url, params=params, timeout=timeout, headers=self._headers())
+            except requests.RequestException as exc:
+                if attempt < attempts - 1:
+                    time.sleep(0.5 * (2 ** attempt))
+                    continue
+                raise RuntimeError(f"Request error for {url}: {exc}") from exc
             if resp.status_code == 404:
                 return None
-            resp.raise_for_status()
+            if resp.status_code in RETRYABLE and attempt < attempts - 1:
+                time.sleep(0.5 * (2 ** attempt))  # 0.5s, then 1.0s
+                continue
+            try:
+                resp.raise_for_status()
+            except requests.HTTPError as exc:
+                raise RuntimeError(f"HTTP error for {url}: {exc}") from exc
             payload = resp.json()
-            if isinstance(payload, dict):
-                return payload
-            return None
-        except requests.HTTPError as exc:
-            raise RuntimeError(f"HTTP error for {url}: {exc}") from exc
-        except requests.RequestException as exc:
-            raise RuntimeError(f"Request error for {url}: {exc}") from exc
+            return payload if isinstance(payload, dict) else None
+        return None
 
     def _crossref_fetch_work_raw(self, doi: str) -> Optional[Dict[str, Any]]:
         url = f"https://api.crossref.org/works/{quote(doi)}"
