@@ -44,6 +44,17 @@ except ImportError:
 from qdrant_client import QdrantClient
 from qdrant_client.http import models as qm
 
+# Optional external discovery (Crossref + OpenAlex). Disabled gracefully if the
+# module or its `requests` dependency is missing.
+try:
+    from crossref_openalex import CrossrefOpenAlexBackend, ServerConfig as XrefConfig
+except Exception as _xref_exc:  # pragma: no cover
+    CrossrefOpenAlexBackend = None
+    XrefConfig = None
+    _XREF_IMPORT_ERROR = str(_xref_exc)
+else:
+    _XREF_IMPORT_ERROR = ""
+
 # ── Configuration (every value overridable via environment / .env) ────────
 QDRANT_URL = os.getenv("QDRANT_URL", "http://localhost:6333")
 QDRANT_API_KEY = os.getenv("QDRANT_API_KEY", "").strip()
@@ -53,6 +64,12 @@ MCP_HOST = os.getenv("MCP_HOST", "0.0.0.0")
 MCP_PORT = int(os.getenv("MCP_PORT", "8080"))
 MCP_TRANSPORT = os.getenv("MCP_TRANSPORT", "streamable-http")
 AUDIT_LOG = os.getenv("AUDIT_LOG", "").strip()
+
+# External discovery (Crossref + OpenAlex): on by default; needs internet (via the
+# proxy). CONTACT_EMAIL joins the API "polite pool" for higher rate limits.
+EXTERNAL_SEARCH = os.getenv("EXTERNAL_SEARCH", "on").strip().lower() not in ("0", "off", "false", "no", "")
+CONTACT_EMAIL = os.getenv("CONTACT_EMAIL", "").strip()
+XREF_CACHE_DB = os.getenv("XREF_CACHE_DB", "/data/crossref_openalex_cache.sqlite")
 
 
 def _parse_tokens(raw: str) -> Dict[str, str]:
@@ -1742,6 +1759,140 @@ def build_server(
             }
         except Exception as exc:
             return {"error": str(exc)}
+
+    # ═══════════════════════════════════════════════════════════════════════
+    # 9. EXTERNAL DISCOVERY — Crossref + OpenAlex (optional; reaches the internet)
+    # ═══════════════════════════════════════════════════════════════════════
+    if EXTERNAL_SEARCH and CrossrefOpenAlexBackend is not None:
+        _xref = CrossrefOpenAlexBackend(XrefConfig(
+            cache_db=XREF_CACHE_DB,
+            user_agent="publicationRAG-crossref-openalex/1.0",
+            mailto=CONTACT_EMAIL,
+            crossref_timeout=15,
+            openalex_timeout=15,
+            work_ttl_seconds=30 * 86400,
+            query_ttl_seconds=24 * 3600,
+            resolution_ttl_seconds=14 * 86400,
+            negative_ttl_seconds=12 * 3600,
+            qdrant_config_path="",          # we do local dedup ourselves (below)
+            qdrant_profile=None,
+            qdrant_default_collection="text",
+            qdrant_presence_ttl_seconds=24 * 3600,
+            qdrant_presence_absent_ttl_seconds=6 * 3600,
+            qdrant_snapshot_ttl_seconds=24 * 3600,
+            qdrant_snapshot_batch_size=1000,
+        ))
+        log.info("external discovery ON (Crossref+OpenAlex) | mailto=%s", CONTACT_EMAIL or "(unset)")
+
+        # Set of DOIs already in the local corpus, for the `in_local_library`
+        # flag. Built lazily, refreshed at most hourly, matched case-insensitively.
+        _corpus = {"dois": None, "ts": 0.0}
+
+        def _corpus_doi_set() -> set:
+            now = time.time()
+            if _corpus["dois"] is not None and now - _corpus["ts"] < 3600:
+                return _corpus["dois"]
+            found: set = set()
+            try:
+                offset = None
+                while True:
+                    points, offset = backend.qdrant.scroll(
+                        collection_name=COLL_SUMMARIES,
+                        limit=2000, offset=offset,
+                        with_payload=["doi"], with_vectors=False,
+                    )
+                    for pt in points:
+                        d = (pt.payload or {}).get("doi")
+                        if d:
+                            found.add(str(d).strip().lower())
+                    if offset is None:
+                        break
+            except Exception as exc:
+                log.warning("could not build local DOI set for dedup: %s", exc)
+            _corpus["dois"] = found
+            _corpus["ts"] = now
+            return found
+
+        @mcp.tool()
+        def search_external(
+            query: str,
+            max_results: int = 15,
+            source: str = "both",
+            year_from: Optional[int] = None,
+            year_to: Optional[int] = None,
+            exclude_in_library: bool = False,
+        ) -> Dict[str, Any]:
+            """Find publications in Crossref + OpenAlex — including ones NOT in the local library.
+
+            Use this to discover related work beyond the local corpus. Every result
+            is flagged `in_local_library`: true = already here (searchable via
+            search_text / search_publications); false = external only. Returns DOI,
+            title, authors, year, venue, abstract (when available), citation count.
+
+            Args:
+                query: Natural-language or keyword query.
+                max_results: Max results (default 15).
+                source: "both" (default), "crossref", or "openalex".
+                year_from / year_to: Optional publication-year range.
+                exclude_in_library: If true, drop results already in the local corpus.
+            """
+            try:
+                res = _xref.search_works(
+                    query=query, max_results=max_results, source=source,
+                    year_from=year_from, year_to=year_to,
+                )
+            except Exception as exc:
+                return {"error": str(exc)}
+            if isinstance(res, dict) and res.get("error"):
+                return res
+            results = res.get("results") or []
+            corpus = _corpus_doi_set()
+            for entry in results:
+                work = entry.get("work") or {}
+                doi = str(work.get("doi") or "").strip().lower()
+                entry["in_local_library"] = bool(doi and doi in corpus)
+            if exclude_in_library:
+                results = [e for e in results if not e.get("in_local_library")]
+                res["results"] = results
+                res["result_count"] = len(results)
+            return res
+
+        @mcp.tool()
+        def get_external_work(
+            doi: Optional[str] = None,
+            openalex_id: Optional[str] = None,
+        ) -> Dict[str, Any]:
+            """Fetch merged Crossref + OpenAlex metadata + abstract for one DOI or OpenAlex ID.
+
+            Args:
+                doi: A DOI, e.g. "10.1016/j.actamat.2014.12.011".
+                openalex_id: An OpenAlex work id, e.g. "W123..." (provide one, not both).
+            """
+            try:
+                return _xref.get_work(doi=doi, openalex_id=openalex_id)
+            except Exception as exc:
+                return {"error": str(exc)}
+
+        @mcp.tool()
+        def resolve_reference(
+            title: Optional[str] = None,
+            first_author: Optional[str] = None,
+            year: Optional[int] = None,
+            journal: Optional[str] = None,
+            doi: Optional[str] = None,
+        ) -> Dict[str, Any]:
+            """Resolve a partial/fuzzy citation to a DOI + metadata via Crossref/OpenAlex.
+
+            Provide whatever you have (title, first author, year, journal); returns
+            the best-matching DOI and its metadata.
+            """
+            try:
+                return _xref.resolve_identifiers(
+                    title=title, first_author=first_author, year=year,
+                    journal=journal, doi=doi,
+                )
+            except Exception as exc:
+                return {"error": str(exc)}
 
     return mcp
 

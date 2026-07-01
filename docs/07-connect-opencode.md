@@ -133,9 +133,10 @@ A few of the most useful tools the assistant can call:
 | `get_publication` / `get_publication_chunks` | Read everything about one publication (by DOI). |
 | `search_tables` / `search_figures` | Find specific data tables or figures. |
 | `corpus_stats` / `list_keywords` | Understand what's in the library and how to filter. |
+| `search_external` / `get_external_work` | Find related work **not** in the library via Crossref + OpenAlex — DOI + abstract ([docs/13](13-external-search.md)). |
 
-(The server exposes **24 tools** in total — citation-graph queries, composition
-search, image similarity, and more.)
+(The server exposes **27 tools** in total — citation-graph queries, composition
+search, image similarity, external discovery, and more.)
 
 ---
 

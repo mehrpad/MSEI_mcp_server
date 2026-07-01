@@ -66,13 +66,15 @@ The full, beginner-proof version is the numbered guide in [`docs/`](docs/).
 
 ## What the server exposes
 
-A FastMCP server (Streamable HTTP) with **24 tools** over the corpus's four
+A FastMCP server (Streamable HTTP) with **27 tools** over the corpus's four
 collections (text chunks, figures, tables, publication summaries): semantic search,
 multi-collection evidence packs, keyword/metadata filtering, citation-graph
 queries, composition/property search, image similarity, facets, and corpus stats.
 Embeddings use Google `gemini-embedding-2-preview` (3072-dim, cosine). It also
-adds `list_databases`, a `/health` endpoint, and per-request IP + username audit
-logging.
+adds **external discovery** (`search_external` / `get_external_work` /
+`resolve_reference`) over **Crossref + OpenAlex** for related publications not in
+the local library ([docs/13](docs/13-external-search.md)), plus `list_databases`,
+a `/health` endpoint, and per-request IP + username audit logging.
 
 Switching to a different corpus is one line (`COLLECTION_PREFIX`) plus a restart;
 a second corpus can run side-by-side on another port (`docker compose --profile
@@ -91,7 +93,7 @@ MSEI_mcp_server/
 ├── docker-compose.yml         ← Qdrant + MCP server
 ├── .env.example               ← copy to .env, set your key
 ├── mcp_server/
-│   ├── server.py              ← the MCP server (24 tools)
+│   ├── server.py              ← the MCP server (27 tools)
 │   ├── requirements.txt
 │   └── Dockerfile
 ├── scripts/
@@ -101,14 +103,15 @@ MSEI_mcp_server/
 ├── client-config/
 │   ├── opencode.example.json  ← what each user pastes into OpenCode
 │   └── README.md              ← the user-facing short guide
-└── docs/                      ← 00–12, the step-by-step setup guide
+└── docs/                      ← 00–13, the step-by-step setup guide
     ├── 00-overview.md            01-linux-basics.md       02-install-docker.md
     ├── 03-start-qdrant.md        04-load-vector-data.md   05-google-api-key.md
     ├── 06-run-mcp-server.md      07-connect-opencode.md   08-update-add-database.md
     ├── 09-operations-troubleshooting.md
     ├── 10-api-token-auth.md      (optional: per-user tokens)
     ├── 11-proxy-setup.md         (FAU/RRZE: VM behind a proxy)
-    └── 12-remote-access.md       (from home: VPN / SSH tunnel)
+    ├── 12-remote-access.md       (from home: VPN / SSH tunnel)
+    └── 13-external-search.md     (Crossref + OpenAlex discovery)
 ```
 
 ---
@@ -121,6 +124,8 @@ MSEI_mcp_server/
 | `COLLECTION_PREFIX` | `materials_v2` | Which corpus (collection prefix) to serve. |
 | `EMBED_MODEL` | `gemini-embedding-2-preview` | Must match what the data was ingested with. |
 | `HOST_PORT` | `8080` | Port the server is published on. |
+| `CONTACT_EMAIL` | _(unset)_ | Email for the Crossref/OpenAlex "polite pool" ([docs/13](docs/13-external-search.md)). |
+| `EXTERNAL_SEARCH` | `on` | External discovery (Crossref+OpenAlex). Set `off` to disable. |
 | `MCP_AUTH_TOKENS` | _(unset)_ | Optional per-user API tokens (`token=name,…`). Empty = open (IP + `X-User`). See [docs/10](docs/10-api-token-auth.md). |
 | `COLLECTION_PREFIX_2` | _(unset)_ | Second corpus for the optional `--profile second` server ([docs/08](docs/08-update-add-database.md)). |
 | `HOST_PORT_2` | `8081` | Port for the optional second-corpus server. |
