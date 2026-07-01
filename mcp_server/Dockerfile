@@ -16,8 +16,10 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install -r requirements.txt
 
-# Application code.
-COPY server.py .
+# Application code. server.py is the MCP server; crossref_openalex.py + cache.py
+# back the external-discovery tools (search_external / get_external_work /
+# resolve_reference) and must be present or those tools silently stay disabled.
+COPY server.py crossref_openalex.py cache.py ./
 
 EXPOSE 8080
 
