@@ -37,7 +37,10 @@ except Exception:  # pragma: no cover - script context
 
 
 SCRIPT_DIR = Path(__file__).resolve().parent
-REPO_ROOT = SCRIPT_DIR.parents[1]
+# Unused here (kept for parity with the reference repo). In the Docker image the
+# module lives flat at /app, which has no grandparent — guard against IndexError.
+_parents = SCRIPT_DIR.parents
+REPO_ROOT = _parents[1] if len(_parents) > 1 else SCRIPT_DIR
 _APP_SUPPORT = Path.home() / "Library" / "Application Support" / "agent-augmented-research"
 DEFAULT_CACHE_DB = _APP_SUPPORT / "cache" / "crossref_openalex" / "cache.sqlite"
 DEFAULT_QDRANT_CONFIG_PATH = None
